@@ -3,47 +3,76 @@
 from __future__ import annotations
 import pandas as pd
 from pandas._typing import Axes, Dtype
-from pandas.api.types import is_list_like, is_hashable
+from pandas.api.types import is_list_like, is_hashable, is_scalar
 
 
 class Frame:
+    _name = "Frame"
+
     def __init__(
         self,
-        data: dict = None,
-        index: Axes = None,
+        data: dict | list | Frame | None = None,
+        columns: Axes | None = None,
+        index: Axes | None = None,
         dtype: Dtype | None = None,
-        copy: bool | None = None,
+        copy: bool = False,
     ):
-        if data is None:
+        if dtype is None:
+            dtype = object
+
+        if data is None or len(data) == 0:
             data = {}
+
+        if isinstance(data, Frame):
+            data = data._data.to_dict()
+
+        if columns is not None:
+            columns = pd.Index(columns)
+
+        # handle non-empty lists and list-likes
         if not isinstance(data, dict):
-            raise TypeError(f"only dicts are allowed")
-        self._data = pd.Series(index=data.keys(), dtype="O")
+            data = list(data)
+            if columns is None:
+                raise ValueError(f"'columns' must not be None, for list-like data")
+            if len(data) != len(columns):
+                raise ValueError(
+                    f"{len(columns)} columns passed, "
+                    f"but data imply {len(data)} columns."
+                )
+            data = dict(zip(columns, data))
 
-        def to_series(o):
-            return pd.Series(o, index=index, dtype=dtype, copy=copy)
+        # now we must have a dict
+        if not isinstance(data, dict):
+            raise TypeError(f"Cannot create from data of type {type(data).__name__!r}")
 
-        def to_frame(o):
-            return pd.DataFrame(o, index=index, dtype=dtype, copy=copy)
+        if columns is None:
+            columns = pd.Index(data.keys())
 
-        for key, value in data.items():
-            if isinstance(value, pd.Series):
-                value = to_series(value)
+        self._data = pd.Series(index=columns, dtype=object)
+
+        for col in columns:
+
+            if col not in data:
+                continue
+
+            value = data[col]
+
+            if isinstance(value, (pd.Series, pd.DataFrame)):
+                value = value.copy(deep=copy)
                 value.name = None
-            elif isinstance(value, pd.DataFrame):
-                value = to_frame(value)
             else:
                 try:
-                    value = to_series(value)
+                    value = pd.Series(value, index=index, dtype=dtype, copy=copy)
                 except Exception:
                     try:
-                        value = to_frame(value)
+                        value = pd.DataFrame(value, index=index, dtype=dtype, copy=copy)
                     except Exception:
                         raise TypeError(
-                            f"{key=}. Cannot cast item of type {type(value)} to Series nor DataFrame"
+                            f"{col=}. Cannot cast item from type "
+                            f"{type(value).__name__!r} to Series nor DataFrame"
                         ) from None
 
-            self._data[key] = value
+            self._data[col] = value
 
     @property
     def columns(self):
@@ -51,10 +80,16 @@ class Frame:
 
     @property
     def empty(self):
-        return not len(self._data.index)
+        return self._data.isna().all()
 
     def __len__(self):
         return len(self.columns)
+
+    def __contains__(self, item):
+        return item in self._data.index
+
+    def __iter__(self):
+        yield from self._data.index
 
     def __delitem__(self, key):
         if key in self.columns:
@@ -64,19 +99,47 @@ class Frame:
     def __getitem__(self, key) -> pd.Series | pd.DataFrame | Frame:
         if key in self.columns:
             return self._data[key]
+        if isinstance(key, (list, pd.Index)):
+            _data = {}
+            for k in key:
+                _data[k] = self[k]
+            return Frame(_data, copy=False)
         raise KeyError(key)
 
     def __setitem__(self, key, value):
-        if not isinstance(value, (pd.Series, pd.DataFrame)):
-            raise TypeError(type(value))
-        self._data[key] = value
+        if isinstance(value, (pd.Series, pd.DataFrame)):
+            self._data[key] = value
+
+        elif isinstance(value, Frame):
+            if isinstance(key, (list, pd.Index)):
+                if len(key) != len(value.columns):
+                    raise ValueError(
+                        f"key has {len(key)} columns, but value "
+                        f"has {len(value.columns)} columns"
+                    )
+                for i, k in enumerate(key):
+                    self._data[k] = value[value.columns[i]]
+            elif is_hashable(key) and len(value.columns) == 1:
+                self._data[key] = value[value.columns[0]]
+            else:
+                raise TypeError(
+                    f"key must be of type list or pd.Index, not {type(key).__name__!r} "
+                )
+        else:
+            raise TypeError(f"{type(value).__name__!r}")
 
     def __str__(self):
+        if self.empty:
+            return f"Empty {self._name}\nColumns: {self.columns.tolist()}"
         sep = " | "
         kws = dict(max_rows=30, min_rows=10)
         strings = {}
         for key, val in self._data.items():
-            strings[key] = val.to_string(**kws).splitlines()
+            if hasattr(val, 'to_string'):
+                lines = val.to_string(**kws).splitlines()
+            else:  # NA - empty column
+                lines = ["  "]
+            strings[key] = lines
         header = ""
         vertline = ""
         for key, lines in strings.items():
@@ -104,6 +167,8 @@ class Frame:
 
         return final
 
+    def __repr__(self):
+        return str(self)
 
 
 if __name__ == "__main__":
@@ -118,6 +183,17 @@ if __name__ == "__main__":
             jasnkk=pd.Series(index=pd.date_range("2020", "2021", 100)),
         )
     )
+
+    fr2 = Frame(
+        dict(
+            a=pd.Series(0, index=range(10)),
+            b=pd.Series(0, index=range(10)),
+        )
+    )
+
+    # fr[list('b')] = fr2
+    fr[list("ab")] = fr2
+    fr[:] = fr2
 
     print(fr)
     print(fr["c"])
