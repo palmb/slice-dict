@@ -29,12 +29,9 @@ class BaseContainer(dict):
         self.update(pairs)
         self.__update_index()
 
-    def _slice_to_index(self, sl) -> pd.Index:
-        return self._index[sl]
-
     def _expand_key(self, key) -> pd.Index:
         if isinstance(key, slice):
-            key = self._slice_to_index(key)
+            key = self._index[key]
         if is_bool_indexer(key):
             if len(key) != len(self.keys()):
                 raise ValueError(

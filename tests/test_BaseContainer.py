@@ -58,7 +58,8 @@ def test_index_setter(container_or_child):
     bc.index = [1, 2, 3]
     assert bc.keys() == dict.fromkeys([1, 2, 3]).keys()
     with pytest.raises(ValueError):
-        bc.index = ['a', 'b']
+        bc.index = ["a", "b"]
+
 
 @pytest.mark.parametrize("value", _test_values)
 def test_values(container_or_child, value):
@@ -79,11 +80,13 @@ def test_keys(container_or_child, key):
         # lists
         (["a"], dict(a=0)),
         (["a", "b"], dict(a=0, b=0)),
+        (pd.Index(["a"]), dict(a=0)),
+        (pd.Index(["a", "b"]), dict(a=0, b=0)),
         # slices
         (slice(None), dict(a=0, b=0, c=0)),
-        (slice(0, 3), dict(a=0, b=0, c=0)),
-        (slice(1, 1), dict()),
         (slice(None, 10), dict(a=0, b=0, c=0)),
+        (slice(0, 2), dict(a=0, b=0)),  # exclusive right bound
+        (slice(1, 1), dict()),  # exclusive right bound
         (slice(None, None, 2), dict(a=0, c=0)),
         # bool
         ([F, F, F], dict()),
@@ -92,7 +95,7 @@ def test_keys(container_or_child, key):
         ([T, T, T], dict(a=0, b=0, c=0)),
     ],
 )
-def test__getitem___complex_key(container_or_child, key, expected):
+def test__getitem__complex_key(container_or_child, key, expected):
     bc = container_or_child(a=0, b=0, c=0)
     result = bc[key]
     assert isinstance(result, BaseContainer)
@@ -117,8 +120,40 @@ def test__getitem___complex_key(container_or_child, key, expected):
         ),
     ],
 )
-def test__getitem___raises(container_or_child, key, err, msg):
+def test__getitem__raises(container_or_child, key, err, msg):
     bc = container_or_child(a=0, b=0, c=0)
     with pytest.raises(err) as e:
         bc[key]  # noqa
     assert e.value.args[0].startswith(msg)
+
+
+@pytest.mark.parametrize(
+    "key,value,expected",
+    [
+        # downgrade if scalar and len() == 1
+        (["a"], 0, dict(a=0, b=None, c=None)),
+        (pd.Index(["a"]), 0, dict(a=0, b=None, c=None)),
+        # list-like
+        (["a", "b"], [0, 0], dict(a=0, b=0, c=None)),
+        (pd.Index(["a", "b"]), [0, 0], dict(a=0, b=0, c=None)),
+        # slices
+        (slice(None), [0, 0, 0], dict(a=0, b=0, c=0)),
+        (slice(None, 10), [0, 0, 0], dict(a=0, b=0, c=0)),
+        (slice(0, 2), [0, 0], dict(a=0, b=0, c=None)),  # exclusive right bound
+        (slice(1, 1), [], dict(a=None, b=None, c=None)),  # exclusive right bound
+        (slice(None, None, 2), [0, 0], dict(a=0, b=None, c=0)),
+        # bool
+        ([F, F, F], [], dict(a=None, b=None, c=None)),
+        ([T, F, F], [0], dict(a=0, b=None, c=None)),
+        ([T, F, T], [0, 0], dict(a=0, b=None, c=0)),
+        ([T, T, T], [0, 0, 0], dict(a=0, b=0, c=0)),
+    ],
+)
+def test__setitem__complex(container_or_child, key, value, expected):
+    result = container_or_child(a=None, b=None, c=None)
+    result[key] = value
+
+    expected = container_or_child(expected)
+    assert result.keys() == expected.keys()
+    assert result.index.equals(expected.index)
+    assert list(result.values()) == list(expected.values())
