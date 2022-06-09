@@ -31,19 +31,6 @@ def test_attrs(container_or_child, attr):
     assert hasattr(container_or_child, attr)
 
 
-_test_values = [
-    None,
-    1,
-    "string",
-    ["0", 1, 2.0],
-    {"key": "value"},
-    BaseContainer(x="x"),
-    AnyChild(x="x"),
-    pd.Series(index=[1, 2], dtype=float),
-    pd.DataFrame(1, index=[1, 2], columns=["c0", "c1"]),
-]
-
-
 @pytest.mark.parametrize("key", [None, 1, 1.0, "a", b"a", np.nan])
 def test_index(container_or_child, key):
     bc = container_or_child(zzz=None)
@@ -66,7 +53,9 @@ def test_index(container_or_child, key):
         ("copy", (), pd.Index(["a"])),
     ],
 )
-def test_update__methods_with_result(container_or_child, setter_name, args, expected):
+def test_index_update__methods_with_result(
+    container_or_child, setter_name, args, expected
+):
     bc = container_or_child(a=None)
     result = getattr(bc, setter_name)(*args)
     assert isinstance(result, container_or_child), type(result)
@@ -89,7 +78,7 @@ def test_update__methods_with_result(container_or_child, setter_name, args, expe
         ("clear", (), pd.Index([])),
     ],
 )
-def test_update_index_inplace_methods(container_or_child, setter_name, args, expected):
+def test_index_update__inplace_methods(container_or_child, setter_name, args, expected):
     bc = container_or_child(a=None)
     getattr(bc, setter_name)(*args)
     assert bc.index.equals(expected)
@@ -101,6 +90,19 @@ def test_index_setter(container_or_child):
     assert bc.keys() == dict.fromkeys([1, 2, 3]).keys()
     with pytest.raises(ValueError):
         bc.index = ["a", "b"]
+
+
+_test_values = [
+    None,
+    1,
+    "string",
+    ["0", 1, 2.0],
+    {"key": "value"},
+    BaseContainer(x="x"),
+    AnyChild(x="x"),
+    pd.Series(index=[1, 2], dtype=float),
+    pd.DataFrame(1, index=[1, 2], columns=["c0", "c1"]),
+]
 
 
 @pytest.mark.parametrize("value", _test_values)

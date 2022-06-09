@@ -10,7 +10,6 @@ from typing import Mapping, MutableMapping, Iterator, Iterable
 
 
 class BaseContainer(UserDict):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__update_index()
@@ -56,7 +55,9 @@ class BaseContainer(UserDict):
                 )
             key = [k for i, k in enumerate(self.keys()) if key[i]]
         if not pd.api.types.is_list_like(key):
-            raise TypeError(f"Cannot index with key of type {type(key).__name__}")  # pragma: no cover
+            raise TypeError(
+                f"Cannot index with key of type {type(key).__name__}"
+            )  # pragma: no cover
         if not isinstance(key, pd.Index):
             key = pd.Index(key)
         return key
@@ -127,6 +128,3 @@ class BaseContainer(UserDict):
         assert _self is self
         self.__update_index()
         return self
-
-
-

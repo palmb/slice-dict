@@ -135,7 +135,7 @@ class Frame:
         kws = dict(max_rows=30, min_rows=10)
         strings = {}
         for key, val in self._data.items():
-            if hasattr(val, 'to_string'):
+            if hasattr(val, "to_string"):
                 lines = val.to_string(**kws).splitlines()
             else:  # NA - empty column
                 lines = ["  "]
