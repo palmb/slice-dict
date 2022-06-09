@@ -1,13 +1,23 @@
 #!/usr/bin/env python
+from __future__ import annotations
+
+from collections import UserDict
+from functools import wraps, partialmethod
 
 import pandas as pd
 from pandas.core.common import is_bool_indexer
+from typing import Mapping, MutableMapping, Iterator, Iterable
 
 
-class BaseContainer(dict):
+class BaseContainer(UserDict):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__update_index()
+
+    # =====================================================
+    # Index
+    # =====================================================
 
     def __update_index(self):
         self._index = pd.Index(self.keys())
@@ -24,10 +34,16 @@ class BaseContainer(dict):
                 f"Length mismatch: Expected {len(self._index)} keys, "
                 f"but got {len(value)} keys."
             )
+        # we must expand the zip now, because values() are a view
+        # and would change after clear()
         pairs = dict(zip(value, self.values()))
         self.clear()
         self.update(pairs)
-        self.__update_index()
+        # self.__update_index()
+
+    # =====================================================
+    # __get/set/del-item__
+    # =====================================================
 
     def _expand_key(self, key) -> pd.Index:
         if isinstance(key, slice):
@@ -40,7 +56,7 @@ class BaseContainer(dict):
                 )
             key = [k for i, k in enumerate(self.keys()) if key[i]]
         if not pd.api.types.is_list_like(key):
-            raise TypeError(f"Cannot index with key of type {type(key).__name__}")
+            raise TypeError(f"Cannot index with key of type {type(key).__name__}")  # pragma: no cover
         if not isinstance(key, pd.Index):
             key = pd.Index(key)
         return key
@@ -53,9 +69,10 @@ class BaseContainer(dict):
 
         key = self._expand_key(key)
 
+        if pd.api.types.is_dict_like(value):
+            value = [value[k] for k in value.keys()]
         if pd.api.types.is_iterator(value):
             value = list(value)
-
         if not pd.api.types.is_list_like(value):
             if len(key) == 1:
                 value = [value]
@@ -68,8 +85,8 @@ class BaseContainer(dict):
                 f"Length mismatch: Got {len(key)} keys, "
                 f"but value has {len(value)} items."
             )
-        for i, k in enumerate(key):
-            super().__setitem__(k, value[i])
+        for i, val in enumerate(value):
+            super().__setitem__(key[i], val)
         self.__update_index()
 
     def __getitem__(self, key):
@@ -83,9 +100,33 @@ class BaseContainer(dict):
         if not missing.empty:
             raise KeyError(f"{missing.tolist()} does not exist")
 
-        # cannot call super() in comprehensions
-        return self.__class__({k: dict.__getitem__(self, k) for k in key})
+        # cannot call super().method in comprehensions
+        return self.__class__(
+            {k: super(self.__class__, self).__getitem__(k) for k in key}
+        )
 
     def __delitem__(self, key):
         super().__delitem__(key)
         self.__update_index()
+
+    # =====================================================
+    # dict methods
+    # =====================================================
+
+    # no need to overwrite
+    # --------------------
+    # def clear(self) -> None:
+    # def copy(self) -> BaseContainer:
+    # def fromkeys(cls, __iterable: Iterable, __value=None) -> BaseContainer:
+    # def popitem(self) -> tuple:
+    # def update(self, __m: Mapping | None = None, **kwargs) -> None:
+
+    def __ior__(self, other):
+        # inplace-or, returns a modified self AND modifies
+        _self = super().__ior__(other)
+        assert _self is self
+        self.__update_index()
+        return self
+
+
+

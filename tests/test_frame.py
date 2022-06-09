@@ -37,7 +37,13 @@ def test_constructor(data, index, dtype, copy):
         (dict(), ["a", "b"], pd.Index(["a", "b"])),
         #
         # given columns ignores keys of data
-        (dict(a=[], ), ["a", "b"], pd.Index(["a", "b"])),
+        (
+            dict(
+                a=[],
+            ),
+            ["a", "b"],
+            pd.Index(["a", "b"]),
+        ),
         (dict(a=[], b=[]), ["a", "b"], pd.Index(["a", "b"])),
         (dict(a=[], b=[], c=[]), ["a", "b"], pd.Index(["a", "b"])),
         (dict(c=[]), ["a", "b"], pd.Index(["a", "b"])),
