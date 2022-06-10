@@ -175,7 +175,6 @@ def test__getitem__raises(container_or_child, key, err, msg):
     "key,value,expected",
     [
         # list-like
-        (["a"], ["a"], dict(a=0, b=None, c=None)),
         (pd.Index(["a"]), 0, dict(a=0, b=None, c=None)),
         (["a", "b"], [0, 0], dict(a=0, b=0, c=None)),
         (pd.Index(["a", "b"]), [0, 0], dict(a=0, b=0, c=None)),
@@ -218,7 +217,7 @@ def test__setitem__complex_keys(container_or_child, key, value, expected):
         (["a", "b"], "iterator-special", dict(a=0, b=1, c=None)),
     ],
 )
-def test__setitem__complex_keys(container_or_child, key, value, expected):
+def test__setitem__complex_keys_test_values(container_or_child, key, value, expected):
     if isinstance(value, str) and value == "iterator-special":
         value = (x for x in [0, 1])
 
