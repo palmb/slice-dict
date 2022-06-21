@@ -1,4 +1,4 @@
 #!/usr/bin/env python
 
 from .frame import Frame
-from .base import BaseContainer
+from .base import IndexContainer, ColumnContainer

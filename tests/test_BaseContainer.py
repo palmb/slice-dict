@@ -3,16 +3,16 @@ import numpy as np
 import pytest
 import pandas as pd
 from operator import or_
-from goodbadugly import BaseContainer
+from goodbadugly.base import IndexContainer, _BaseContainer
 
 T, F = True, False
 
 
-class AnyChild(BaseContainer):
+class AnyChild(_BaseContainer):
     pass
 
 
-@pytest.fixture(params=[BaseContainer, AnyChild])
+@pytest.fixture(params=[_BaseContainer, AnyChild])
 def container_or_child(request):
     return request.param
 
@@ -22,7 +22,7 @@ def container_or_child(request):
 def test_creation(container_or_child, args, kwargs):
     bc = container_or_child(*args, **kwargs)
     assert isinstance(bc, container_or_child)
-    assert isinstance(bc, BaseContainer)
+    assert isinstance(bc, _BaseContainer)
     # assert isinstance(bc, dict)
 
 
@@ -30,75 +30,13 @@ def test_creation(container_or_child, args, kwargs):
 def test_attrs(container_or_child, attr):
     assert hasattr(container_or_child, attr)
 
-
-@pytest.mark.parametrize("key", [None, 1, 1.0, "a", b"a", np.nan])
-def test_index(container_or_child, key):
-    bc = container_or_child(zzz=None)
-    assert bc.index.equals(pd.Index(["zzz"]))
-    bc[key] = None
-    assert bc.index.equals(pd.Index(["zzz", key]))
-    del bc[key]
-    assert bc.index.equals(pd.Index(["zzz"]))
-
-
-@pytest.mark.parametrize(
-    "setter_name,args,expected",
-    [
-        # `{"a": None}` is in the container per default
-        ("__copy__", (), pd.Index(["a"])),
-        ("__or__", ({"b": 1},), pd.Index(["a", "b"])),
-        ("__ror__", ({"b": 1},), pd.Index(["b", "a"])),
-        ("__ior__", ({"b": 1},), pd.Index(["a", "b"])),  # works inplace and return self
-        ("fromkeys", (["b"],), pd.Index(["b"])),
-        ("copy", (), pd.Index(["a"])),
-    ],
-)
-def test_index_update__methods_with_result(
-    container_or_child, setter_name, args, expected
-):
-    bc = container_or_child(a=None)
-    result = getattr(bc, setter_name)(*args)
-    assert isinstance(result, container_or_child), type(result)
-    assert result.index.equals(expected)
-
-
-@pytest.mark.parametrize(
-    "setter_name,args,expected",
-    [
-        # `{"a": None}` is in the container per default
-        ("__setitem__", ("b", 1), pd.Index(["a", "b"])),
-        ("__delitem__", ("a",), pd.Index([])),
-        ("__ior__", ({"b": 1},), pd.Index(["a", "b"])),  # works inplace and return self
-        ("setdefault", ("b", 1), pd.Index(["a", "b"])),
-        ("setdefault", ("a", 1), pd.Index(["a"])),
-        ("pop", ("a",), pd.Index([])),
-        ("pop", ("b", None), pd.Index(["a"])),
-        ("popitem", (), pd.Index([])),
-        ("update", ({"b": 1},), pd.Index(["a", "b"])),
-        ("clear", (), pd.Index([])),
-    ],
-)
-def test_index_update__inplace_methods(container_or_child, setter_name, args, expected):
-    bc = container_or_child(a=None)
-    getattr(bc, setter_name)(*args)
-    assert bc.index.equals(expected)
-
-
-def test_index_setter(container_or_child):
-    bc = container_or_child(a=10, b=20, c=30)
-    bc.index = [1, 2, 3]
-    assert bc.keys() == dict.fromkeys([1, 2, 3]).keys()
-    with pytest.raises(ValueError):
-        bc.index = ["a", "b"]
-
-
 _test_values = [
     None,
     1,
     "string",
     ["0", 1, 2.0],
     {"key": "value"},
-    BaseContainer(x="x"),
+    _BaseContainer(x="x"),
     AnyChild(x="x"),
     pd.Series(index=[1, 2], dtype=float),
     pd.DataFrame(1, index=[1, 2], columns=["c0", "c1"]),
@@ -142,11 +80,10 @@ def test_keys(container_or_child, key):
 def test__getitem__complex_keys(container_or_child, key, expected):
     bc = container_or_child(a=0, b=0, c=0)
     result = bc[key]
-    assert isinstance(result, BaseContainer)
+    assert isinstance(result, _BaseContainer)
 
     expected = container_or_child(expected)
     assert result.keys() == expected.keys()
-    assert result.index.equals(expected.index)
 
 
 @pytest.mark.parametrize(
@@ -197,7 +134,6 @@ def test__setitem__complex_keys(container_or_child, key, value, expected):
 
     expected = container_or_child(expected)
     assert result.keys() == expected.keys()
-    assert result.index.equals(expected.index)
     assert list(result.values()) == list(expected.values())
 
 
@@ -211,7 +147,7 @@ def test__setitem__complex_keys(container_or_child, key, value, expected):
         (["a", "b"], pd.Index([0, 1]), dict(a=0, b=1, c=None)),
         # dict-like values
         (["a", "b"], dict(b=1, x=1), dict(a=1, b=1, c=None)),
-        (["a", "b"], BaseContainer(b=1, x=1), dict(a=1, b=1, c=None)),
+        (["a", "b"], _BaseContainer(b=1, x=1), dict(a=1, b=1, c=None)),
         (["a", "b"], AnyChild(b=1, x=1), dict(a=1, b=1, c=None)),
         # iterator - special treatment because it gets consumed
         (["a", "b"], "iterator-special", dict(a=0, b=1, c=None)),
@@ -226,7 +162,6 @@ def test__setitem__complex_keys_test_values(container_or_child, key, value, expe
 
     expected = container_or_child(expected)
     assert result.keys() == expected.keys()
-    assert result.index.equals(expected.index)
     assert list(result.values()) == list(expected.values())
 
 

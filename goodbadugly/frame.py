@@ -193,7 +193,7 @@ if __name__ == "__main__":
 
     # fr[list('b')] = fr2
     fr[list("ab")] = fr2
-    fr[:] = fr2
+    # fr[:] = fr2
 
     print(fr)
     print(fr["c"])

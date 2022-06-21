@@ -8,12 +8,11 @@ from functools import wraps, partialmethod
 import pandas as pd
 from pandas.core.common import is_bool_indexer
 from typing import Mapping, MutableMapping, Iterator, Iterable, overload, Any, Hashable
-from .lib import log_call
 
 
-class BaseContainer(UserDict):
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
+class _BaseContainer(UserDict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     # =====================================================
     # Index
@@ -26,24 +25,6 @@ class BaseContainer(UserDict):
     def _check_value(self, value):  # noqa
         """Overwrite to restrict type of a single value"""
         return value
-
-    @property
-    def index(self):
-        return pd.Index(self.keys())
-
-    @index.setter
-    def index(self, value):
-        value = pd.Index(value)
-        if len(self.keys()) != len(value):
-            raise ValueError(
-                f"Length mismatch: Expected {len(self.keys())} keys, "
-                f"but got {len(value)} keys."
-            )
-        # we must expand the zip now, because values() are a view
-        # and would change after clear()
-        pairs = dict(zip(value, self.values()))
-        self.clear()
-        self.update(pairs)
 
     # =====================================================
     # __get/set/del-item__
@@ -70,7 +51,7 @@ class BaseContainer(UserDict):
             or if key cannot be cast to pd.Index
         """
         if isinstance(key, slice):
-            key = self.index[key]
+            key = pd.Index(self.keys())[key]
 
         if is_bool_indexer(key):
             if len(key) != len(self.keys()):
@@ -92,11 +73,11 @@ class BaseContainer(UserDict):
 
     @overload
     def __setitem__(self, key: Hashable, value: Any) -> None:
-        ...
+        ...  # pragma: no cover
 
     @overload
     def __setitem__(self, key: slice | Iterable, value: Iterable) -> None:
-        ...
+        ...  # pragma: no cover
 
     def __setitem__(self, key, value):
         """
@@ -148,11 +129,11 @@ class BaseContainer(UserDict):
 
     @overload
     def __getitem__(self, key: Hashable) -> Any:
-        ...
+        ...  # pragma: no cover
 
     @overload
-    def __getitem__(self, key: slice | Iterable) -> BaseContainer:
-        ...
+    def __getitem__(self, key: slice | Iterable) -> _BaseContainer:
+        ...  # pragma: no cover
 
     def __getitem__(self, key):
         # scalar gives item, all other kinds of keys
@@ -174,3 +155,35 @@ class BaseContainer(UserDict):
                 for k in key
             }
         )
+
+
+class _Axis:
+    def __init__(self, name):
+        self._name = name
+
+    def __get__(self, instance, owner):
+        if instance is None:  # class attribute access
+            return self
+        print(instance, owner)
+        return pd.Index(instance.keys())
+
+    def __set__(self, instance, value):
+        value = pd.Index(value)
+        if len(instance.keys()) != len(value):
+            raise ValueError(
+                f"Length mismatch: Expected {len(instance.keys())} "
+                f"{self._name} keys, but got {len(value)} keys."
+            )
+        # we must expand the zip now, because values() are a view
+        # and would change after clear()
+        pairs = dict(zip(value, instance.values()))
+        instance.clear()
+        instance.update(pairs)
+
+
+class IndexContainer(_BaseContainer):
+    index = _Axis("index")
+
+
+class ColumnContainer(_BaseContainer):
+    columns = _Axis("columns")
