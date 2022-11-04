@@ -81,7 +81,7 @@ class Frame(ColumnContainer):
                 val = pd.Series("", index=[""])
 
             if isinstance(val, pd.Series):
-                val = val.to_frame(name=" "*len(str(key)))
+                val = val.to_frame(name=" " * len(str(key)))
             else:
                 df_is_present = True
 
@@ -109,4 +109,3 @@ class Frame(ColumnContainer):
 
     def __repr__(self):
         return str(self)
-

@@ -9,7 +9,6 @@ from typing import Iterable, overload, Any, Hashable
 
 
 class _BaseContainer(UserDict):
-
     def _set_single_item_callback(self, key, value):  # noqa
         """
         Callback before setting a value for a single key.
@@ -97,7 +96,7 @@ class _BaseContainer(UserDict):
         ...  # pragma: no cover
 
     def __setitem__(self, key, value):
-        """ Sets a value or a set of values at once. """
+        """Sets a value or a set of values at once."""
 
         _cb = self._set_single_item_callback
 
@@ -153,9 +152,7 @@ class _BaseContainer(UserDict):
         # INFO:
         # cannot call `super().method` in comprehensions
         return self.__class__(
-            {
-                k: super(self.__class__, self).__getitem__(k) for k in key
-            }
+            {k: super(self.__class__, self).__getitem__(k) for k in key}
         )
 
 

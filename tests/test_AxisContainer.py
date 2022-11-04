@@ -23,9 +23,9 @@ def test_creation(klass, args, kwargs):
 def test_attrs(klass, attr):
     assert hasattr(klass, attr)
     if issubclass(klass, ColumnContainer):
-        assert hasattr(klass, 'columns')
+        assert hasattr(klass, "columns")
     if issubclass(klass, IndexContainer):
-        assert hasattr(klass, 'index')
+        assert hasattr(klass, "index")
 
 
 @pytest.mark.parametrize(
@@ -85,10 +85,7 @@ def test_index_update__methods_with_result(
         ("clear", (), pd.Index([])),
     ],
 )
-def test_index_update__inplace_methods(
-    klass, axis_name, setter_name, args, expected
-
-):
+def test_index_update__inplace_methods(klass, axis_name, setter_name, args, expected):
     bc = klass(a=None)
     getattr(bc, setter_name)(*args)
     assert getattr(bc, axis_name).equals(expected)
@@ -103,4 +100,3 @@ def test_index_setter(klass, axis_name):
     assert bc.keys() == dict.fromkeys([1, 2, 3]).keys()
     with pytest.raises(ValueError):
         setattr(bc, axis_name, [1, 2])
-

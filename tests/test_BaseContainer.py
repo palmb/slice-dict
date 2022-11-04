@@ -30,6 +30,7 @@ def test_creation(container_or_child, args, kwargs):
 def test_attrs(container_or_child, attr):
     assert hasattr(container_or_child, attr)
 
+
 _test_values = [
     None,
     1,
