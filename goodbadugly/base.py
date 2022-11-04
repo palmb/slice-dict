@@ -1,30 +1,44 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
-import logging
 from collections import UserDict
-from functools import wraps, partialmethod
 
 import pandas as pd
 from pandas.core.common import is_bool_indexer
-from typing import Mapping, MutableMapping, Iterator, Iterable, overload, Any, Hashable
+from typing import Iterable, overload, Any, Hashable
 
 
 class _BaseContainer(UserDict):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-    # =====================================================
-    # Index
-    # =====================================================
+    def _set_single_item_callback(self, key, value):  # noqa
+        """
+        Callback before setting a value for a single key.
 
-    def _check_key(self, key):  # noqa
-        """Overwrite to restrict type of a single key"""
-        return key
+        This is called *only* for single (hashable) keys.
+        List-like, slices and other non-hashable keys are
+        evaluated/expanded before and this callback is then
+        called for each item within them.
 
-    def _check_value(self, value):  # noqa
-        """Overwrite to restrict type of a single value"""
-        return value
+        This callback can be used to restrict keys and/or
+        values to specific types.
+
+        Parameters
+        ----------
+        key : hashable
+            The key to insert/replace a value.
+
+        value : any
+            The value to insert/replace.
+
+        See Also
+        --------
+
+        Return
+        ------
+        key: hashable
+        value: any
+        """
+        return key, value
 
     # =====================================================
     # __get/set/del-item__
@@ -53,7 +67,7 @@ class _BaseContainer(UserDict):
         if isinstance(key, slice):
             key = pd.Index(self.keys())[key]
 
-        if is_bool_indexer(key):
+        elif is_bool_indexer(key):
             if len(key) != len(self.keys()):
                 raise ValueError(
                     f"Unalienable boolean indexer. {len(self.keys())}"
@@ -61,7 +75,10 @@ class _BaseContainer(UserDict):
                 )
             key = [k for i, k in enumerate(self.keys()) if key[i]]
 
-        if not pd.api.types.is_list_like(key):
+        elif pd.api.types.is_list_like(key):
+            pass
+
+        else:
             raise TypeError(
                 f"Cannot index with key of type {type(key).__name__}"
             )  # pragma: no cover
@@ -80,30 +97,16 @@ class _BaseContainer(UserDict):
         ...  # pragma: no cover
 
     def __setitem__(self, key, value):
-        """
-        Sets a value or a set of values at once.
+        """ Sets a value or a set of values at once. """
 
-        Parameters
-        ----------
-        key : hashable, slice of int, pd.Index, list-like or boolean list-like
-            The key to index. If hashable (strings, numbers, None, etc.) the
-            value of any type is
-            value is
-        value :
+        _cb = self._set_single_item_callback
 
-        Returns
-        -------
-
-        """
         if pd.api.types.is_hashable(key):
-            key = self._check_key(key)
-            value = self._check_value(value)
-            super().__setitem__(key, value)
-            return
+            return super().__setitem__(*_cb(key, value))
+            # return self.__setitem_single_key__(key, value)
 
         key = self._expand_key(key)
 
-        # check value
         if pd.api.types.is_dict_like(value):
             value = [value[k] for k in value.keys()]
         if pd.api.types.is_iterator(value):
@@ -122,10 +125,10 @@ class _BaseContainer(UserDict):
                 f"but value has {len(value)} items."
             )
 
-        for i, val in enumerate(value):
-            k = self._check_key(key[i])
-            val = self._check_value(val)
-            super().__setitem__(k, val)
+        for k, val in zip(key, value):
+            if not pd.api.types.is_hashable(k):
+                raise KeyError(f"key '{k}' is not hashable")
+            super().__setitem__(*_cb(k, val))
 
     @overload
     def __getitem__(self, key: Hashable) -> Any:
@@ -139,7 +142,6 @@ class _BaseContainer(UserDict):
         # scalar gives item, all other kinds of keys
         # return __class__ type instances (dict-likes)
         if pd.api.types.is_hashable(key):
-            key = self._check_key(key)
             return super().__getitem__(key)
 
         key = self._expand_key(key)
@@ -148,11 +150,11 @@ class _BaseContainer(UserDict):
         if not missing.empty:
             raise KeyError(f"{missing.tolist()} does not exist")
 
+        # INFO:
+        # cannot call `super().method` in comprehensions
         return self.__class__(
             {
-                # cannot call super().method in comprehensions
-                self._check_key(k): super(self.__class__, self).__getitem__(k)
-                for k in key
+                k: super(self.__class__, self).__getitem__(k) for k in key
             }
         )
 
@@ -164,7 +166,6 @@ class _Axis:
     def __get__(self, instance, owner):
         if instance is None:  # class attribute access
             return self
-        print(instance, owner)
         return pd.Index(instance.keys())
 
     def __set__(self, instance, value):
