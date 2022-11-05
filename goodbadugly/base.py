@@ -147,7 +147,7 @@ class _BaseContainer(UserDict):
 
         missing = key.difference(self.keys())
         if not missing.empty:
-            raise KeyError(f"{missing.tolist()} does not exist")
+            raise KeyError(f"keys {missing.tolist()} does not exist")
 
         # INFO:
         # cannot call `super().method` in comprehensions
@@ -167,16 +167,26 @@ class _Axis:
 
     def __set__(self, instance, value):
         value = pd.Index(value)
+        if not value.is_unique:
+            raise ValueError("Keys must be unique, no doubles allowed.")
         if len(instance.keys()) != len(value):
             raise ValueError(
                 f"Length mismatch: Expected {len(instance.keys())} "
                 f"{self._name} keys, but got {len(value)} keys."
             )
-        # we must expand the zip now, because values() are a view
-        # and would change after clear()
+        # We must expand the zip now, because values()
+        # are a view and would be empty after clear().
+        # We also don't set data directly, because inherit
+        # classes may restrict key-types or some key-values,
+        # so we use the regular __setitem__() via update().
+        data = instance.data
         pairs = dict(zip(value, instance.values()))
-        instance.clear()
-        instance.update(pairs)
+        try:
+            instance.data = {}
+            instance.update(pairs)
+        except Exception:
+            instance.data = data
+            raise
 
 
 class IndexContainer(_BaseContainer):

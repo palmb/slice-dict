@@ -96,9 +96,9 @@ def test__getitem__complex_keys(container_or_child, key, expected):
         ([T, F], ValueError, r"Unalienable boolean indexer."),
         ([T, F, F, F], ValueError, r"Unalienable boolean indexer."),
         (
-            slice("a"),
-            TypeError,
-            "slice indices must be integers or None or have an __index__ method",
+                slice("a"),
+                TypeError,
+                "slice indices must be integers or None or have an __index__ method",
         ),
     ],
 )
@@ -183,3 +183,6 @@ def test__setitem__raises(container_or_child, key, value, err, msg):
     with pytest.raises(err) as e:
         bc[key] = value
     assert e.value.args[0].startswith(msg)
+
+
+

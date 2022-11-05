@@ -57,7 +57,7 @@ def test_axis(klass, axis_name, key):
     ],
 )
 def test_index_update__methods_with_result(
-    klass, axis_name, setter_name, args, expected
+        klass, axis_name, setter_name, args, expected
 ):
     bc = klass(a=None)
     result = getattr(bc, setter_name)(*args)
@@ -100,3 +100,16 @@ def test_index_setter(klass, axis_name):
     assert bc.keys() == dict.fromkeys([1, 2, 3]).keys()
     with pytest.raises(ValueError):
         setattr(bc, axis_name, [1, 2])
+
+
+def test_set_index_fails_and_keep_old_keys():
+    class RestrictedChild(ColumnContainer):
+        def _set_single_item_callback(self, key, value):
+            if not isinstance(key, str):
+                raise TypeError()
+            return key, value
+
+    rc = RestrictedChild(a=10, b=20, c=30)
+    with pytest.raises(TypeError):
+        rc.columns = ['x', 'y', 9999]
+    assert rc.keys() == dict.fromkeys(['a', 'b', 'c']).keys()
