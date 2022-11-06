@@ -2,14 +2,48 @@
 
 from __future__ import annotations
 
+import warnings
+
+import typing
+
+import abc
+import numpy as np
+import functools
+
 import copy
 
 import pandas as pd
 from .base import _Axis, _BaseContainer, ColumnContainer
 
 
-class Frame(ColumnContainer):
+class IndexMixin:
+
+    @abc.abstractmethod
+    def values(self) -> typing.ValuesView[pd.Series | pd.DataFrame]:
+        ...
+
+    def _get_indexes(self):
+        indexes = []
+        for obj in self.values():
+            indexes.append(obj.index)
+        return indexes
+
+    def _union_index(self):
+        return functools.reduce(pd.Index.union, self._get_indexes(), pd.Index([]))
+
+    def _shared_index(self):
+        indexes = self._get_indexes()
+        if indexes:
+            return functools.reduce(pd.Index.intersection, indexes)
+        return pd.Index([])
+
+
+class Frame(ColumnContainer, IndexMixin):
     _name = "Frame"
+
+    @property
+    def _constructor(self) -> type[Frame]:
+        return Frame
 
     def _set_single_item_callback(self, key, value):
         if not isinstance(value, (pd.Series, pd.DataFrame)):
@@ -20,6 +54,57 @@ class Frame(ColumnContainer):
     @property
     def empty(self):
         return len(self.columns) == 0
+
+    def _uniquify_key(self, name, postfix='_new'):
+        if name not in self.keys():
+            return name
+        name += postfix
+        if name not in self.keys():
+            return name
+        i = 1
+        while f"{name}{i}" in self.keys():
+            i += 1
+        return f"{name}{i}"
+
+    def flatten(self):
+        """
+        Promote dataframe columns to first level columns.
+
+        Prepend column names of an inner dataframe with the
+        key/column name of the outer frame.
+
+        Examples
+        --------
+        >>> frame = Frame(key1=pd.DataFrame(np.arange(4).reshape(2,2), columns=['c1', 'c2']))
+        >>> frame
+             key0 |
+        ========= |
+           c0  c1 |
+        0   0   1 |
+        1   2   3 |
+
+        >>> frame.flatten()
+           key1_c1 |    key1_c2 |
+        ========== | ========== |
+        0        0 | 0        1 |
+        1        2 | 1        3 |
+        """
+        data = {}
+        for key, value in self.items():
+            if isinstance(value, pd.DataFrame):
+                for col, ser in dict(value).items():
+                    data[self._uniquify_key(f'{key}_{col}')] = ser
+            else:
+                data[key] = value
+        return self.__class__(data)
+
+    def to_df(self):
+        warnings.warn('to_df() is deprecated, use '
+                      'to_dataframe() instead.', DeprecationWarning)
+        return self.to_dataframe()
+
+    def to_dataframe(self):
+        return pd.DataFrame(dict(self.flatten()))
 
     def __repr__(self):
         return str(self)
@@ -53,7 +138,7 @@ class Frame(ColumnContainer):
             Returns the result as a string.
         """
         if self.empty:
-            return f"Empty {self._name}\nColumns: {self.columns.tolist()}"
+            return f"Empty {self.__class__.__name__}"
 
         pd_to_string = dict(max_rows=max_rows, min_rows=min_rows)
         col_sep, head_sep = " | ", "="
@@ -116,7 +201,7 @@ class SaqcFrame(Frame):
             )
         if isinstance(value, list):
             value = pd.Series(value)
-        if isinstance(value, pd.DataFrame):
-            raise TypeError('saqc cant handle dataframes')
+        # if isinstance(value, pd.DataFrame):
+        #     raise TypeError('saqc cant handle dataframes')
 
         return super()._set_single_item_callback(key, value)
