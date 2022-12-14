@@ -5,11 +5,20 @@ from collections import UserDict
 
 import pandas as pd
 from pandas.core.common import is_bool_indexer
-from typing import Iterable, overload, Any, Hashable
+from typing import Iterable, overload, Any, Hashable, Tuple
+
+# todo: spead the `final()` word to the world
 
 
 class _BaseContainer(UserDict):
-    def _set_single_item_callback(self, key, value):  # noqa
+    """
+    A dict like container that support slicing, boolean selection
+    and passing multiple keys at once.
+    """
+
+    def _set_single_item_callback(
+        self, key: Hashable, value: Any
+    ) -> Tuple[Hashable, Any]:
         """
         Callback before setting a value for a single key.
 
@@ -160,38 +169,31 @@ class _Axis:
     def __init__(self, name):
         self._name = name
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance: _BaseContainer | None, owner) -> pd.Index:
         if instance is None:  # class attribute access
-            return self
+            return self  # noqa
         return pd.Index(instance.keys())
 
-    def __set__(self, instance, value):
+    def __set__(self, instance: _BaseContainer, value: Any) -> None:
         value = pd.Index(value)
         if not value.is_unique:
-            raise ValueError("Keys must be unique, no doubles allowed.")
+            raise ValueError(f"{self._name} must not have duplicates.")
         if len(instance.keys()) != len(value):
             raise ValueError(
-                f"Length mismatch: Expected {len(instance.keys())} "
-                f"{self._name} keys, but got {len(value)} keys."
+                f"Length mismatch: Expected {self._name} have "
+                f"{len(instance.keys())} elements, new values "
+                f"have {len(value)} elements."
             )
         # We must expand the zip now, because values()
         # are a view and would be empty after clear().
-        # We also don't set data directly, because inherit
-        # classes may restrict key-types or some key-values,
-        # so we use the regular __setitem__() via update().
-        data = instance.data
-        pairs = dict(zip(value, instance.values()))
+        data = dict(instance.data)  # shallow copy
+        new = dict(zip(value, instance.data.values()))
         try:
             instance.data = {}
-            instance.update(pairs)
-        except Exception:
+            # We don't set data directly, because inherit
+            # classes may restrict key-types or some key-values,
+            # so we use the regular __setitem__() via update().
+            instance.update(new)
+        except Exception as e:
             instance.data = data
-            raise
-
-
-class IndexContainer(_BaseContainer):
-    index = _Axis("index")
-
-
-class ColumnContainer(_BaseContainer):
-    columns = _Axis("columns")
+            raise type(e)(f"setting new {self._name} failed, because {e}") from None

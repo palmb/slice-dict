@@ -3,9 +3,17 @@ import numpy as np
 import pytest
 import pandas as pd
 from operator import or_
-from goodbadugly.base import IndexContainer, ColumnContainer, _BaseContainer
+from goodbadugly.base import _BaseContainer, _Axis
 
 T, F = True, False
+
+
+class IndexContainer(_BaseContainer):
+    index = _Axis("index")
+
+
+class ColumnContainer(_BaseContainer):
+    columns = _Axis("columns")
 
 
 @pytest.mark.parametrize("klass", [ColumnContainer, IndexContainer])

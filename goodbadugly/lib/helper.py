@@ -9,5 +9,4 @@ def log_call(func):
     def wrapper(*args, **kwargs):
         logging.debug(f"{func.__name__} was called")
         return func(*args, **kwargs)
-
     return wrapper

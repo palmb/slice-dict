@@ -2,8 +2,7 @@
 import numpy as np
 import pytest
 import pandas as pd
-from operator import or_
-from goodbadugly.base import IndexContainer, _BaseContainer
+from goodbadugly.base import _BaseContainer
 
 T, F = True, False
 
@@ -91,8 +90,8 @@ def test__getitem__complex_keys(container_or_child, key, expected):
     "key,err,msg",
     [
         ("x", KeyError, "x"),
-        (["a", "y"], KeyError, "['y'] does not exist"),
-        (["x", "y"], KeyError, "['x', 'y'] does not exist"),
+        (["a", "y"], KeyError, "keys ['y'] does not exist"),
+        (["x", "y"], KeyError, "keys ['x', 'y'] does not exist"),
         ([T, F], ValueError, r"Unalienable boolean indexer."),
         ([T, F, F, F], ValueError, r"Unalienable boolean indexer."),
         (
@@ -183,6 +182,3 @@ def test__setitem__raises(container_or_child, key, value, err, msg):
     with pytest.raises(err) as e:
         bc[key] = value
     assert e.value.args[0].startswith(msg)
-
-
-
