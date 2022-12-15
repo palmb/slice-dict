@@ -11,37 +11,74 @@ import numpy as np
 import functools
 
 import pandas as pd
-from .base import _Axis, _BaseContainer
+from SliceDict import SliceDict
 from .formatting import Formatter
 
+
+class _Axis:
+    def __init__(self, name):
+        self._name = name
+
+    def __get__(self, instance: Frame | None, owner) -> pd.Index:
+        if instance is None:  # class attribute access
+            return self  # noqa
+        return pd.Index(instance.keys())
+
+    def __set__(self, instance: Frame, value: Any) -> None:
+        value = pd.Index(value)
+        if not value.is_unique:
+            raise ValueError(f"{self._name} must not have duplicates.")
+        if len(instance.keys()) != len(value):
+            raise ValueError(
+                f"Length mismatch: Expected {self._name} have "
+                f"{len(instance.keys())} elements, new values "
+                f"have {len(value)} elements."
+            )
+        # We must expand the zip now, because values()
+        # are a view and would be empty after clear().
+        data = dict(instance.data)  # shallow copy
+        new = dict(zip(value, instance.data.values()))
+        try:
+            instance.data = {}
+            # We don't set data directly, because inherit
+            # classes may restrict key-types or some key-values,
+            # so we use the regular __setitem__() via update().
+            instance.update(new)
+        except Exception as e:
+            instance.data = data
+            raise type(e)(f"setting new {self._name} failed, because {e}") from None
 
 class IndexMixin:
     @abc.abstractmethod
     def values(self) -> ValuesView[pd.Series | pd.DataFrame]:
         ...
 
-    def __get_indexes(self):
+    def _get_indexes(self):
         indexes = []
         for obj in self.values():
             indexes.append(obj.index)
         return indexes
 
-    def _union_index(self):
-        return functools.reduce(pd.Index.union, self.__get_indexes(), pd.Index([]))
+    def union_index(self):
+        return functools.reduce(pd.Index.union, self._get_indexes(), pd.Index([]))
 
-    def _shared_index(self):
-        indexes = self.__get_indexes()
+    def shared_index(self):
+        indexes = self._get_indexes()
         if indexes:
             return functools.reduce(pd.Index.intersection, indexes)
         return pd.Index([])
 
 
-class Frame(_BaseContainer, IndexMixin):
-    columns = _Axis("columns")
-
+class Frame(SliceDict, IndexMixin):
     @property
     def _constructor(self) -> type[Frame]:
         return Frame
+
+    columns = _Axis("columns")
+
+    @property
+    def empty(self):
+        return len(self.columns) == 0
 
     def _set_single_item_callback(self, key, value):
         if not isinstance(value, (pd.Series, pd.DataFrame)):
@@ -51,20 +88,13 @@ class Frame(_BaseContainer, IndexMixin):
             )
         return super()._set_single_item_callback(key, value)
 
-    @property
-    def empty(self):
-        return len(self.columns) == 0
-
-    def _uniquify_key(self, name, postfix="_new"):
-        if name not in self.keys():
-            return name
-        name += postfix
+    def _uniquify_key(self, name):
         if name not in self.keys():
             return name
         i = 1
-        while f"{name}{i}" in self.keys():
+        while f"{name}({i})" in self.keys():
             i += 1
-        return f"{name}{i}"
+        return f"{name}({i})"
 
     def flatten(self):
         """
@@ -89,7 +119,7 @@ class Frame(_BaseContainer, IndexMixin):
         0        0 | 0        1 |
         1        2 | 1        3 |
         """
-        data = {}
+        data = dict()
         for key, value in self.items():
             if isinstance(value, pd.DataFrame):
                 for col, ser in dict(value).items():
@@ -102,7 +132,7 @@ class Frame(_BaseContainer, IndexMixin):
         return pd.DataFrame(dict(self.flatten()))
 
     def __repr__(self):
-        return str(self)
+        return repr(dict(self))
 
     def __str__(self):
         max_rows = pd.get_option("display.max_rows")
@@ -137,7 +167,6 @@ class Frame(_BaseContainer, IndexMixin):
             Returns the result as a string.
         """
         return Formatter(self, max_rows, min_rows, show_df_column_names).to_string()
-
 
 
 class SaqcFrame(Frame):  # dios replacement

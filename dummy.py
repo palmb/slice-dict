@@ -29,3 +29,4 @@ if __name__ == "__main__":
     # print(f.to_string())
     # print(f.to_string(show_df_column_names=False))
     print(f)
+    print(repr(f))

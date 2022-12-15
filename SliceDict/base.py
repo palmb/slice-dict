@@ -2,10 +2,21 @@
 from __future__ import annotations
 
 from collections import UserDict
-
-import pandas as pd
-from pandas.core.common import is_bool_indexer
 from typing import Iterable, overload, Any, Hashable, Tuple
+
+try:
+    from pandas import Index
+except ImportError:
+    from .index import Index
+
+from ._lib import (
+    is_hashable,
+    is_list_like,
+    is_dict_like,
+    is_iterator,
+    is_bool_list_like,
+)
+
 
 # todo: spead the `final()` word to the world
 
@@ -52,7 +63,7 @@ class _BaseContainer(UserDict):
     # __get/set/del-item__
     # =====================================================
 
-    def _expand_key(self, key: Any) -> pd.Index:
+    def _expand_key(self, key: Any) -> Index:
         """
         Expand slice- and list-like and boolean list-likes to an index.
 
@@ -63,19 +74,19 @@ class _BaseContainer(UserDict):
 
         Returns
         -------
-        index: pd.Index
+        index: Index
             The expanded key
 
         Raises
         ------
         ValueError: If boolean list-like key missmatch
         TypeError: If key is a slice of other than integer
-            or if key cannot be cast to pd.Index
+            or if key cannot be cast to Index
         """
         if isinstance(key, slice):
-            key = pd.Index(self.keys())[key]
+            key = Index(self.keys())[key]
 
-        elif is_bool_indexer(key):
+        elif is_bool_list_like(key):
             if len(key) != len(self.keys()):
                 raise ValueError(
                     f"Unalienable boolean indexer. {len(self.keys())}"
@@ -83,7 +94,7 @@ class _BaseContainer(UserDict):
                 )
             key = [k for i, k in enumerate(self.keys()) if key[i]]
 
-        elif pd.api.types.is_list_like(key):
+        elif is_list_like(key):
             pass
 
         else:
@@ -91,8 +102,8 @@ class _BaseContainer(UserDict):
                 f"Cannot index with key of type {type(key).__name__}"
             )  # pragma: no cover
 
-        if not isinstance(key, pd.Index):
-            key = pd.Index(key)
+        if not isinstance(key, Index):
+            key = Index(key)
 
         return key
 
@@ -109,17 +120,17 @@ class _BaseContainer(UserDict):
 
         _cb = self._set_single_item_callback
 
-        if pd.api.types.is_hashable(key):
+        if is_hashable(key):
             return super().__setitem__(*_cb(key, value))
             # return self.__setitem_single_key__(key, value)
 
         key = self._expand_key(key)
 
-        if pd.api.types.is_dict_like(value):
+        if is_dict_like(value):
             value = [value[k] for k in value.keys()]
-        if pd.api.types.is_iterator(value):
+        if is_iterator(value):
             value = list(value)
-        if not pd.api.types.is_list_like(value):
+        if not is_list_like(value):
             if len(key) == 1:
                 value = [value]
             else:
@@ -134,7 +145,7 @@ class _BaseContainer(UserDict):
             )
 
         for k, val in zip(key, value):
-            if not pd.api.types.is_hashable(k):
+            if not is_hashable(k):
                 raise KeyError(f"key '{k}' is not hashable")
             super().__setitem__(*_cb(k, val))
 
@@ -149,7 +160,7 @@ class _BaseContainer(UserDict):
     def __getitem__(self, key):
         # scalar gives item, all other kinds of keys
         # return __class__ type instances (dict-likes)
-        if pd.api.types.is_hashable(key):
+        if is_hashable(key):
             return super().__getitem__(key)
 
         key = self._expand_key(key)
@@ -163,37 +174,3 @@ class _BaseContainer(UserDict):
         return self.__class__(
             {k: super(self.__class__, self).__getitem__(k) for k in key}
         )
-
-
-class _Axis:
-    def __init__(self, name):
-        self._name = name
-
-    def __get__(self, instance: _BaseContainer | None, owner) -> pd.Index:
-        if instance is None:  # class attribute access
-            return self  # noqa
-        return pd.Index(instance.keys())
-
-    def __set__(self, instance: _BaseContainer, value: Any) -> None:
-        value = pd.Index(value)
-        if not value.is_unique:
-            raise ValueError(f"{self._name} must not have duplicates.")
-        if len(instance.keys()) != len(value):
-            raise ValueError(
-                f"Length mismatch: Expected {self._name} have "
-                f"{len(instance.keys())} elements, new values "
-                f"have {len(value)} elements."
-            )
-        # We must expand the zip now, because values()
-        # are a view and would be empty after clear().
-        data = dict(instance.data)  # shallow copy
-        new = dict(zip(value, instance.data.values()))
-        try:
-            instance.data = {}
-            # We don't set data directly, because inherit
-            # classes may restrict key-types or some key-values,
-            # so we use the regular __setitem__() via update().
-            instance.update(new)
-        except Exception as e:
-            instance.data = data
-            raise type(e)(f"setting new {self._name} failed, because {e}") from None
