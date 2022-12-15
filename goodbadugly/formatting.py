@@ -42,15 +42,15 @@ class Formatter:
         return str(key)
 
     def to_string(self) -> str:
-        if self._obj.empty:
+        if len(self._obj) == 0:
             return self._stringify_empty_class(self._obj)
         for key, val in self._obj.data.items():
             key = self.key_to_string(key, val)
             try:
-                val = self.stringify(val)
-            except BaseException:
-                pass
-            finally:
+                string = self.stringify(val)
+            except BaseException:  # noqa
+                string = NotImplemented
+            if string is NotImplemented:
                 string = str(val)
             self._add(key, string.splitlines())
         return self._render()
