@@ -141,23 +141,24 @@ def is_list_like(obj, allow_sets=True):
     )
 
 
-def is_bool_list_like(obj: Any) -> bool:
+def is_boolean_indexer(obj: abc.Iterable) -> bool:
     """
-    Check whether `obj` is a list-like with boolean elements.
+    Check whether `obj` is a valid boolean indexer.
 
     Parameters
     ----------
     obj : Any
-        Only list-likes with all elements be either
-        `True` or `False` considered boolean list-likes.
+        Only list-likes may be considered as valid
+        boolean indexer. At least `obj` must be iterable.
 
     Returns
     -------
     bool
-        Whether `obj` is a boolean list-like.
+        Whether `obj` is valid boolean indexer.
     """
-    return is_list_like(obj) and (
-        (hasattr(obj, "dtype") and obj.dtype == bool)
+    return (
+        hasattr(obj, "dtype")
+        and obj.dtype == bool
         # return first non-boolean element or return True
         or next(filter(lambda e: not isinstance(e, bool), obj), True) is True
     )

@@ -102,8 +102,8 @@ def test__getitem__complex_keys(container_or_child, key, expected):
         ("x", KeyError, "x"),
         (["a", "y"], KeyError, "keys ['y'] does not exist"),
         (["x", "y"], KeyError, "keys ['x', 'y'] does not exist"),
-        ([T, F], ValueError, r"Unalienable boolean indexer."),
-        ([T, F, F, F], ValueError, r"Unalienable boolean indexer."),
+        ([T, F], ValueError, r"Boolean indexer has wrong length"),
+        ([T, F, F, F], ValueError, r"Boolean indexer has wrong length"),
         (
                 slice("a"),
                 TypeError,
@@ -179,8 +179,8 @@ def test__setitem__complex_keys_test_values(container_or_child, key, value, expe
     "key,value,err,msg",
     [
         # bad keys
-        ([T, F], None, ValueError, r"Unalienable boolean indexer."),
-        ([T, F, F, F], None, ValueError, r"Unalienable boolean indexer."),
+        ([T, F], None, ValueError, r"Boolean indexer has wrong length"),
+        ([T, F, F, F], None, ValueError, r"Boolean indexer has wrong length"),
         (slice("a"), None, TypeError, "slice indices must be integers or None or"),
         # bad value-key combination
         ([T, F, T], 1, TypeError, r"value must be some kind of collection if"),

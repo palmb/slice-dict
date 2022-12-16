@@ -18,6 +18,9 @@ class SliceDict(UserDict):
     and passing multiple keys at once.
     """
 
+    def _set_single_item(self, key: Hashable, value: Any):
+        return super().__setitem__(key, value)
+
     def _set_single_item_callback(
         self, key: Hashable, value: Any
     ) -> Tuple[Hashable, Any]:
@@ -74,25 +77,22 @@ class SliceDict(UserDict):
         TypeError: If key is a slice of other than integer
             or if key cannot be cast to Index
         """
-        # todo: iterator / inf-iterator?
         if isinstance(key, slice):
             key = Index(self.keys())[key]
-        elif lib.is_bool_list_like(key):  # todo: rm bool-list-check -> try-except
-            if len(key) != len(self.keys()):
-                raise ValueError(
-                    f"Unalienable boolean indexer. {len(self.keys())}"
-                    f"items are present, but indexer is of length {len(key)}"
-                )
-            key = [k for i, k in enumerate(self.keys()) if key[i]]
         elif lib.is_list_like(key):
-            pass
+            if lib.is_boolean_indexer(key):
+                if len(key) != len(self.keys()):
+                    raise ValueError(
+                        f"Boolean indexer has wrong length: "
+                        f"{len(key)} instead of {len(self.keys())}"
+                    )
+                key = Index(k for i, k in enumerate(self.keys()) if key[i])
+            elif not isinstance(key, Index):
+                key = Index(key)
         else:
             raise TypeError(
                 f"Cannot index with key of type {type(key).__name__}"
             )  # pragma: no cover
-
-        if not isinstance(key, Index):
-            key = Index(key)
         return key
 
     @overload
@@ -104,13 +104,11 @@ class SliceDict(UserDict):
         ...  # pragma: no cover
 
     def __setitem__(self, key, value):
-        """Sets a value or a set of values at once."""
+        """Sets a value or a collection of values."""
 
-        _cb = self._set_single_item_callback
-
+        # includes generators, range(3), etc.
         if lib.is_hashable(key):
-            return super().__setitem__(*_cb(key, value))
-            # return self.__setitem_single_key__(key, value)
+            return self._set_single_item(key, value)
 
         key = self._expand_key(key)
 
@@ -132,11 +130,13 @@ class SliceDict(UserDict):
                 f"but value has {len(value)} items."
             )
 
-        for k, val in zip(key, value):
-            k, val = _cb(k, val)
-            if not lib.is_hashable(k):
-                raise KeyError(f"cannot set item with non-hashable key '{k}'")
-            super().__setitem__(k, val)
+        data = dict(self.data)  # shallow copy
+        try:
+            for k, v in zip(key, value):
+                self._set_single_item(k, v)
+            data = self.data
+        finally:
+            self.data = data
 
     @overload
     def __getitem__(self, key: Hashable) -> Any:
