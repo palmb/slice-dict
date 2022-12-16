@@ -156,4 +156,8 @@ def is_bool_list_like(obj: Any) -> bool:
     bool
         Whether `obj` is a boolean list-like.
     """
-    return is_list_like(obj) and all([isinstance(e, bool) for e in obj])
+    return is_list_like(obj) and (
+        (hasattr(obj, "dtype") and obj.dtype == bool)
+        # return first non-boolean element or return True
+        or next(filter(lambda e: not isinstance(e, bool), obj), True) is True
+    )
