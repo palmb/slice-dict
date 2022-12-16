@@ -4,24 +4,15 @@ from __future__ import annotations
 from collections import UserDict
 from typing import Iterable, overload, Any, Hashable, Tuple
 
-try:
-    from pandas import Index
-except ImportError:
-    from .index import Index
+from .index import Index
 
-from ._lib import (
-    is_hashable,
-    is_list_like,
-    is_dict_like,
-    is_iterator,
-    is_bool_list_like,
-)
+from . import lib
 
 
 # todo: spead the `final()` word to the world
 
 
-class _BaseContainer(UserDict):
+class SliceDict(UserDict):
     """
     A dict like container that support slicing, boolean selection
     and passing multiple keys at once.
@@ -83,20 +74,18 @@ class _BaseContainer(UserDict):
         TypeError: If key is a slice of other than integer
             or if key cannot be cast to Index
         """
+        # todo: iterator / inf-iterator?
         if isinstance(key, slice):
             key = Index(self.keys())[key]
-
-        elif is_bool_list_like(key):
+        elif lib.is_bool_list_like(key):  # todo: rm bool-list-check -> try-except
             if len(key) != len(self.keys()):
                 raise ValueError(
                     f"Unalienable boolean indexer. {len(self.keys())}"
                     f"items are present, but indexer is of length {len(key)}"
                 )
             key = [k for i, k in enumerate(self.keys()) if key[i]]
-
-        elif is_list_like(key):
+        elif lib.is_list_like(key):
             pass
-
         else:
             raise TypeError(
                 f"Cannot index with key of type {type(key).__name__}"
@@ -104,7 +93,6 @@ class _BaseContainer(UserDict):
 
         if not isinstance(key, Index):
             key = Index(key)
-
         return key
 
     @overload
@@ -120,17 +108,17 @@ class _BaseContainer(UserDict):
 
         _cb = self._set_single_item_callback
 
-        if is_hashable(key):
+        if lib.is_hashable(key):
             return super().__setitem__(*_cb(key, value))
             # return self.__setitem_single_key__(key, value)
 
         key = self._expand_key(key)
 
-        if is_dict_like(value):
+        if lib.is_dict_like(value):
             value = [value[k] for k in value.keys()]
-        if is_iterator(value):
+        if lib.is_iterator(value):
             value = list(value)
-        if not is_list_like(value):
+        if not lib.is_list_like(value):
             if len(key) == 1:
                 value = [value]
             else:
@@ -145,22 +133,23 @@ class _BaseContainer(UserDict):
             )
 
         for k, val in zip(key, value):
-            if not is_hashable(k):
-                raise KeyError(f"key '{k}' is not hashable")
-            super().__setitem__(*_cb(k, val))
+            k, val = _cb(k, val)
+            if not lib.is_hashable(k):
+                raise KeyError(f"cannot set item with non-hashable key '{k}'")
+            super().__setitem__(k, val)
 
     @overload
     def __getitem__(self, key: Hashable) -> Any:
         ...  # pragma: no cover
 
     @overload
-    def __getitem__(self, key: slice | Iterable) -> _BaseContainer:
+    def __getitem__(self, key: slice | Iterable) -> SliceDict:
         ...  # pragma: no cover
 
     def __getitem__(self, key):
         # scalar gives item, all other kinds of keys
         # return __class__ type instances (dict-likes)
-        if is_hashable(key):
+        if lib.is_hashable(key):
             return super().__getitem__(key)
 
         key = self._expand_key(key)

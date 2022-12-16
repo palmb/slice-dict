@@ -1,17 +1,17 @@
 #!/usr/bin/env python
-import numpy as np
 import pytest
+import numpy as np
 import pandas as pd
-from goodbadugly.base import _BaseContainer
+from SliceDict import SliceDict
 
 T, F = True, False
 
 
-class AnyChild(_BaseContainer):
+class AnyChild(SliceDict):
     pass
 
 
-@pytest.fixture(params=[_BaseContainer, AnyChild])
+@pytest.fixture(params=[SliceDict, AnyChild])
 def container_or_child(request):
     return request.param
 
@@ -21,7 +21,7 @@ def container_or_child(request):
 def test_creation(container_or_child, args, kwargs):
     bc = container_or_child(*args, **kwargs)
     assert isinstance(bc, container_or_child)
-    assert isinstance(bc, _BaseContainer)
+    assert isinstance(bc, SliceDict)
     # assert isinstance(bc, dict)
 
 
@@ -36,7 +36,7 @@ _test_values = [
     "string",
     ["0", 1, 2.0],
     {"key": "value"},
-    _BaseContainer(x="x"),
+    SliceDict(x="x"),
     AnyChild(x="x"),
     pd.Series(index=[1, 2], dtype=float),
     pd.DataFrame(1, index=[1, 2], columns=["c0", "c1"]),
@@ -80,7 +80,7 @@ def test_keys(container_or_child, key):
 def test__getitem__complex_keys(container_or_child, key, expected):
     bc = container_or_child(a=0, b=0, c=0)
     result = bc[key]
-    assert isinstance(result, _BaseContainer)
+    assert isinstance(result, SliceDict)
 
     expected = container_or_child(expected)
     assert result.keys() == expected.keys()
@@ -147,7 +147,7 @@ def test__setitem__complex_keys(container_or_child, key, value, expected):
         (["a", "b"], pd.Index([0, 1]), dict(a=0, b=1, c=None)),
         # dict-like values
         (["a", "b"], dict(b=1, x=1), dict(a=1, b=1, c=None)),
-        (["a", "b"], _BaseContainer(b=1, x=1), dict(a=1, b=1, c=None)),
+        (["a", "b"], SliceDict(b=1, x=1), dict(a=1, b=1, c=None)),
         (["a", "b"], AnyChild(b=1, x=1), dict(a=1, b=1, c=None)),
         # iterator - special treatment because it gets consumed
         (["a", "b"], "iterator-special", dict(a=0, b=1, c=None)),
