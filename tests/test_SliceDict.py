@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import pytest
 import numpy as np
-from SliceDict import SliceDict
+from slice_dict import SliceDict
 
 try:
     import pandas as pd
 except ImportError:
-    from SliceDict.index import SimpleIndex
+    from slice_dict.index import SimpleIndex
     class _X:  # noqa
         def __init__(self, *args, **kwargs): return
     class pd:    # noqa
