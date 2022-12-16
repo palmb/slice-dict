@@ -1,8 +1,18 @@
 #!/usr/bin/env python
 import pytest
 import numpy as np
-import pandas as pd
 from SliceDict import SliceDict
+
+try:
+    import pandas as pd
+except ImportError:
+    from SliceDict.index import SimpleIndex
+    class _X:  # noqa
+        def __init__(self, *args, **kwargs): return
+    class pd:    # noqa
+        Series = type("Series", (_X,), {})
+        DataFrame = type("DataFrame", (_X,), {})
+        Index = SimpleIndex
 
 T, F = True, False
 
