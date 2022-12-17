@@ -19,6 +19,9 @@ features, like getting and setting multiple keys at once and slicing.
 >>> d
 {'zero': 0, 'one': 1,}
 
+>>> isinstance(d, dict)
+True
+
 >>> d[['two', 'three']] = 2, 3
 >>> d[1:-1]
 {'one': 1, 'two': 2}
