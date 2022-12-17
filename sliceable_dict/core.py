@@ -12,7 +12,7 @@ from . import lib
 # todo: spead the `final()` word to the world
 
 
-class SliceDict(UserDict):
+class SliceDict(UserDict, dict):
     """
     A dict like container that support slicing, boolean selection
     and passing multiple keys at once.
