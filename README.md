@@ -4,7 +4,7 @@ A simple dictionary that support slicing and multiple key selection.
 
 ## Installation and requirements
 
-*Slice-dict* requires Python 3.7+ to run and can be installed by running 
+*sliceable-dict* requires Python 3.7+ to run and can be installed by running 
 ```bash
 pip install sliceable-dict
 ```
