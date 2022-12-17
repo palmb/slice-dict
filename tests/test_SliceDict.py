@@ -6,7 +6,7 @@ from sliceable_dict import SliceDict
 try:
     import pandas as pd
 except ImportError:
-    from sliceable_dict.index import SimpleIndex
+    from sliceable_dict.core import SimpleIndex
     class _X:  # noqa
         def __init__(self, *args, **kwargs): return
     class pd:    # noqa
@@ -159,14 +159,9 @@ def test__setitem__complex_keys(container_or_child, key, value, expected):
         (["a", "b"], dict(b=1, x=1), dict(a=1, b=1, c=None)),
         (["a", "b"], SliceDict(b=1, x=1), dict(a=1, b=1, c=None)),
         (["a", "b"], AnyChild(b=1, x=1), dict(a=1, b=1, c=None)),
-        # iterator - special treatment because it gets consumed
-        (["a", "b"], "iterator-special", dict(a=0, b=1, c=None)),
     ],
 )
 def test__setitem__complex_keys_test_values(container_or_child, key, value, expected):
-    if isinstance(value, str) and value == "iterator-special":
-        value = (x for x in [0, 1])
-
     result = container_or_child(a=None, b=None, c=None)
     result[key] = value
 
@@ -183,7 +178,7 @@ def test__setitem__complex_keys_test_values(container_or_child, key, value, expe
         ([T, F, F, F], None, ValueError, r"Boolean indexer has wrong length"),
         (slice("a"), None, TypeError, "slice indices must be integers or None or"),
         # bad value-key combination
-        ([T, F, T], 1, TypeError, r"value must be some kind of collection if"),
+        ([T, F, T], 1, TypeError, r"Value must be some kind of collection if"),
         ([T, F, T], [1, 2, 3], ValueError, r"Length mismatch: Got 2 keys, but"),
     ],
 )

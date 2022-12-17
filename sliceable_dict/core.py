@@ -1,15 +1,25 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
-from collections import UserDict
-from typing import Iterable, overload, Any, Hashable, Tuple
-
-from .index import Index
-
+from collections import UserDict, UserList
+from typing import Iterable, overload, Any, Hashable
 from . import lib
 
 
 # todo: spead the `final()` word to the world
+
+
+class SimpleIndex(UserList):
+    def difference(self, other):
+        # set(self)-set(other) does not preserve order !
+        return SimpleIndex(k for k in self if k not in other)
+
+    @property
+    def empty(self):
+        return len(self) == 0
+
+    def tolist(self):
+        return self.data
 
 
 class SliceDict(UserDict, dict):
@@ -18,46 +28,11 @@ class SliceDict(UserDict, dict):
     and passing multiple keys at once.
     """
 
-    def _set_single_item(self, key: Hashable, value: Any):
-        return super().__setitem__(key, value)
-
-    def _set_single_item_callback(
-        self, key: Hashable, value: Any
-    ) -> Tuple[Hashable, Any]:
-        """
-        Callback before setting a value for a single key.
-
-        This is called *only* for single (hashable) keys.
-        List-like, slices and other non-hashable keys are
-        evaluated/expanded before and this callback is then
-        called for each item within them.
-
-        This callback can be used to restrict keys and/or
-        values to specific types.
-
-        Parameters
-        ----------
-        key : hashable
-            The key to insert/replace a value.
-
-        value : any
-            The value to insert/replace.
-
-        See Also
-        --------
-
-        Return
-        ------
-        key: hashable
-        value: any
-        """
-        return key, value
-
     # =====================================================
     # __get/set/del-item__
     # =====================================================
 
-    def _expand_key(self, key: Any) -> Index:
+    def _expand_key(self, key: Any) -> SimpleIndex:
         """
         Expand slice- and list-like and boolean list-likes to an index.
 
@@ -78,7 +53,7 @@ class SliceDict(UserDict, dict):
             or if key cannot be cast to Index
         """
         if isinstance(key, slice):
-            key = Index(self.keys())[key]
+            key = SimpleIndex(self.keys())[key]
         elif lib.is_list_like(key):
             if lib.is_boolean_indexer(key):
                 if len(key) != len(self.keys()):
@@ -86,12 +61,13 @@ class SliceDict(UserDict, dict):
                         f"Boolean indexer has wrong length: "
                         f"{len(key)} instead of {len(self.keys())}"
                     )
-                key = Index(k for i, k in enumerate(self.keys()) if key[i])
-            elif not isinstance(key, Index):
-                key = Index(key)
+                key = SimpleIndex(k for i, k in enumerate(self.keys()) if key[i])
+            elif not isinstance(key, SimpleIndex):
+                key = SimpleIndex(key)
         else:
             raise TypeError(
-                f"Cannot index with key of type {type(key).__name__}"
+                f"Key must be hashable, a slice or a list-like of hashable items, "
+                f"but type {type(key).__name__} was given."
             )  # pragma: no cover
         return key
 
@@ -108,22 +84,20 @@ class SliceDict(UserDict, dict):
 
         # includes generators, range(3), etc.
         if lib.is_hashable(key):
-            return self._set_single_item(key, value)
-
+            return self.__setitem_single__(key, value)
         key = self._expand_key(key)
 
         if lib.is_dict_like(value):
             value = [value[k] for k in value.keys()]
-        if lib.is_iterator(value):
-            value = list(value)
-        if not lib.is_list_like(value):
-            if len(key) == 1:
-                value = [value]
-            else:
-                raise TypeError(
-                    "value must be some kind of collection if multiple keys are given"
-                )
-
+        elif lib.is_list_like(value):
+            pass
+        elif len(key) == 1:
+            value = [value]
+        else:
+            raise TypeError(
+                "Value must be some kind of collection if multiple keys are given,"
+                f"but {type(value).__name__} is not."
+            )
         if len(key) != len(value):
             raise ValueError(
                 f"Length mismatch: Got {len(key)} keys, "
@@ -133,10 +107,36 @@ class SliceDict(UserDict, dict):
         data = dict(self.data)  # shallow copy
         try:
             for k, v in zip(key, value):
-                self._set_single_item(k, v)
+                self.__setitem_single__(k, v)
             data = self.data
         finally:
             self.data = data
+
+    def __setitem_single__(self, key: Hashable, value: Any):
+        """
+        Setting a value for a single key.
+
+        This is called *only* for single (hashable) keys.
+        List-like, slices and other non-hashable keys are
+        evaluated/expanded before and then this function
+        is called for each of them.
+
+        This function can be used to restrict keys and/or
+        values to specific types.
+
+        Parameters
+        ----------
+        key : hashable
+            The key to insert/replace a value.
+
+        value : any
+            The value to insert/replace.
+
+        Return
+        ------
+        None
+        """
+        return super().__setitem__(key, value)
 
     @overload
     def __getitem__(self, key: Hashable) -> Any:
