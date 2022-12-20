@@ -57,6 +57,7 @@ _test_values = [
 def test_values(container_or_child, value):
     bc = container_or_child(a=value)
     assert isinstance(bc["a"], type(value))
+    assert bc["a"] is value
 
 
 @pytest.mark.parametrize("key", [None, 1, 1.0, "a", b"a", np.nan])

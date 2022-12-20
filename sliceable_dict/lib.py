@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typing import Any
+from typing import Any, Hashable
 from collections import abc
 
 
@@ -159,6 +159,6 @@ def is_boolean_indexer(obj: abc.Iterable) -> bool:
     return (
         hasattr(obj, "dtype")
         and obj.dtype == bool
-        # return first non-boolean element or return True
+        # (return first non-boolean element or return True) is True
         or next(filter(lambda e: not isinstance(e, bool), obj), True) is True
     )
