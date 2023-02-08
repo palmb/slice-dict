@@ -168,25 +168,29 @@ class TypedSliceDict(SliceDict):
     _key_types: tuple = ()
     _value_types: tuple = ()
 
+    @property
+    def value_types(self):
+        return self._value_types or Any
+
+    @property
+    def key_types(self):
+        return self._key_types or Hashable
+
     def __setitem_single__(self, key: Hashable, value: Any):
-        self._validate_type(key, self._key_types, "key")
-        self._validate_type(value, self._value_types, "value")
+        self._validate_type(key, self._key_types, "key", errors='raise')
+        self._validate_type(value, self._value_types, "value", errors='raise')
         super().__setitem_single__(key, value)
 
     @staticmethod
     def _validate_type(obj: object, types: type | tuple, name, errors="raise"):
-        if errors == "raise":
-            success = obj
-        elif errors == "ignore":
-            success = True
-        else:
-            raise ValueError("errors must be one of 'raise' or 'ignore'")
+        # errors: 'ignore' or 'raise'
         if not types:
-            return success
+            return True
         if isinstance(obj, types):
-            return success
+            return True
         if errors == "ignore":
             return False
         raise TypeError(
             f"{name} must be of type {' or '.join(types)}, not {type(obj)}"
         )
+
