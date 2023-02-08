@@ -191,6 +191,6 @@ class TypedSliceDict(SliceDict):
         if errors == "ignore":
             return False
         raise TypeError(
-            f"{name} must be of type {' or '.join(types)}, not {type(obj)}"
+            f"{name} must be of type {' or '.join(map(repr, types))}, not {type(obj)}"
         )
 
