@@ -119,8 +119,9 @@ class SliceDict(UserDict, dict):
             value = [value]
         else:
             raise TypeError(
-                "Value must be some kind of collection if multiple keys are given,"
-                f"but {type(value).__name__} is not."
+                f"Type of value must be some kind of "
+                f"collection if multiple keys are given, "
+                f"but type {type(value).__name__} is not."
             )
         if len(key) != len(value):
             raise ValueError(f"Got {len(key)} keys, but {len(value)} values.")
@@ -164,30 +165,28 @@ class SliceDict(UserDict, dict):
 
 
 class TypedSliceDict(SliceDict):
-
     _key_types: tuple = ()
     _value_types: tuple = ()
 
-    @final
     def __setitem_single__(self, key: Hashable, value: Any):
-        if self._key_types and not isinstance(key, self._key_types):
-            key = self._convert_key(key)
-            if not isinstance(key, self._key_types):
-                raise TypeError(
-                    f"Key must be of type {'or'.join(self._key_types)}, "
-                    f"not {type(key).__name__}"
-                )
-        if self._value_types and not isinstance(value, self._value_types):
-            value = self._convert_value(value)
-            if not isinstance(value, self._value_types):
-                raise TypeError(
-                    f"Value must be of type {'or'.join(self._value_types)}, "
-                    f"not {type(value).__name__}"
-                )
+        self._validate_type(key, self._key_types, "key")
+        self._validate_type(value, self._value_types, "value")
         super().__setitem_single__(key, value)
 
-    def _convert_key(self, key: Hashable) -> Hashable:  # noqa
-        return key
-
-    def _convert_value(self, value: Any) -> Any:  # noqa
-        return value
+    @staticmethod
+    def _validate_type(obj: object, types: type | tuple, name, errors="raise"):
+        if errors == "raise":
+            success = obj
+        elif errors == "ignore":
+            success = True
+        else:
+            raise ValueError("errors must be one of 'raise' or 'ignore'")
+        if not types:
+            return success
+        if isinstance(obj, types):
+            return success
+        if errors == "ignore":
+            return False
+        raise TypeError(
+            f"{name} must be of type {' or '.join(types)}, not {type(obj).__name__}"
+        )
