@@ -90,8 +90,8 @@ class SliceDict(UserDict, dict):
                 key = SimpleIndex(key)
         else:
             raise TypeError(
-                f"Key must be hashable, a slice or a list-like of hashable items, "
-                f"but type {type(key).__name__} was given."
+                f"Key must be hashable, a list-like of hashable items or a slice, "
+                f"but is of type {type(key)}"
             )  # pragma: no cover
         return key
 
@@ -119,9 +119,9 @@ class SliceDict(UserDict, dict):
             value = [value]
         else:
             raise TypeError(
-                f"Type of value must be some kind of "
+                f"Value must be some kind of "
                 f"collection if multiple keys are given, "
-                f"but type {type(value).__name__} is not."
+                f"but is of type {type(value)}."
             )
         if len(key) != len(value):
             raise ValueError(f"Got {len(key)} keys, but {len(value)} values.")
@@ -188,5 +188,5 @@ class TypedSliceDict(SliceDict):
         if errors == "ignore":
             return False
         raise TypeError(
-            f"{name} must be of type {' or '.join(types)}, not {type(obj).__name__}"
+            f"{name} must be of type {' or '.join(types)}, not {type(obj)}"
         )

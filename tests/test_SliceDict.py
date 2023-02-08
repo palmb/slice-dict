@@ -180,7 +180,7 @@ def test__setitem__complex_keys_test_values(container_or_child, key, value, expe
         (slice("a"), None, TypeError, "slice indices must be integers or None or"),
         # bad value-key combination
         ([T, F, T], 1, TypeError, r"Value must be some kind of collection if"),
-        ([T, F, T], [1, 2, 3], ValueError, r"Length mismatch: Got 2 keys, but"),
+        ([T, F, T], [1, 2, 3], ValueError, r"Got 2 keys, but 3 values"),
     ],
 )
 def test__setitem__raises(container_or_child, key, value, err, msg):
