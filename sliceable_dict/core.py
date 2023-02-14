@@ -8,13 +8,23 @@ from . import lib
 
 
 class _SimpleIndex(UserList):
+    def __init__(self, initlist=None, dtype=None):
+        super().__init__(initlist)
+        self.dtype = dtype or getattr(initlist, "dtype", None)
+
+    def __finalize__(self, other: _SimpleIndex):
+        self.dtype = other.dtype
+        return self
+
     def unique(self) -> _SimpleIndex:
         # set() operations don't preserve order
-        return _SimpleIndex(dict.fromkeys(self))
+        return _SimpleIndex(dict.fromkeys(self)).__finalize__(self)
 
     def difference(self, other: Iterable) -> _SimpleIndex:
         # must be unique
-        return _SimpleIndex(k for k in self.unique() if k not in other)
+        return _SimpleIndex(k for k in self.unique() if k not in other).__finalize__(
+            self
+        )
 
     def union(self, other: Iterable) -> _SimpleIndex:
         # can have duplicates
@@ -23,24 +33,26 @@ class _SimpleIndex(UserList):
         # and seems impossible without value counting or successive
         # adding or removing items.
         # Index([1,1,2]).union(Index([1,2,2]) => Index([1,1,2,2])
-        return self + _SimpleIndex(k for k in other if k not in self)
+        return (self + _SimpleIndex(k for k in other if k not in self)).__finalize__(
+            self
+        )
 
     def intersection(self, other: Iterable) -> _SimpleIndex:
         # must be unique
-        return _SimpleIndex(k for k in self.unique() if k in other)
+        return _SimpleIndex(k for k in self.unique() if k in other).__finalize__(self)
 
     def symmetric_difference(self, other: Iterable) -> _SimpleIndex:
         # must be unique
         return _SimpleIndex(
             k for k in self.union(other).unique() if k not in self.intersection(other)
-        )
+        ).__finalize__(self)
 
     @property
     def empty(self) -> bool:
         return len(self) == 0
 
     def tolist(self) -> list:
-        return self.data
+        return list(self.data)  # shallow copy
 
 
 class SliceDict(UserDict, dict):
@@ -75,21 +87,24 @@ class SliceDict(UserDict, dict):
         """
         if isinstance(key, slice):
             key = _SimpleIndex(self.keys())[key]
+
         elif lib.is_list_like(key):
-            if lib.is_boolean_indexer(key):  # exclude pd.DataFrame
+            # making a list from key, ensures numeric indexing
+            # even if key has an index attribute that would be
+            # used otherwise (e.g. with pd.Series)
+            key = _SimpleIndex(key)
+
+            if lib.is_boolean_indexer(key):
                 if len(key) != len(self.keys()):
                     raise ValueError(
                         f"Boolean indexer has wrong length: "
                         f"{len(key)} instead of {len(self.keys())}"
                     )
-                key = list(key)  # remove index eg. for pd.Series
                 key = _SimpleIndex(k for i, k in enumerate(self.keys()) if key[i])
-            elif not isinstance(key, _SimpleIndex):
-                key = _SimpleIndex(key)
         else:
             raise TypeError(
-                f"Key must be hashable, a list-like of hashable items or a slice, "
-                f"but is of type {type(key)}"
+                f"Key must be hashable, a list-like of hashable items, "
+                f"a boolean list-like or a slice, not of type {type(key)}"
             )  # pragma: no cover
         return key
 
@@ -197,8 +212,8 @@ class TypedSliceDict(SliceDict):
         return self._key_types or Hashable
 
     def __setitem_single__(self, key: Hashable, value: Any):
-        self._validate_type(key, self._key_types, "key", errors='raise')
-        self._validate_type(value, self._value_types, "value", errors='raise')
+        self._validate_type(key, self._key_types, "key", errors="raise")
+        self._validate_type(value, self._value_types, "value", errors="raise")
         super().__setitem_single__(key, value)
 
     @staticmethod
@@ -213,4 +228,3 @@ class TypedSliceDict(SliceDict):
         raise TypeError(
             f"{name} must be of type {' or '.join(map(repr, types))}, not {type(obj)}"
         )
-
