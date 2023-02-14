@@ -2,36 +2,36 @@
 from __future__ import annotations
 
 from collections import UserDict, UserList
-from typing import Iterable, overload, Any, Hashable, Tuple
+from typing import Iterable, overload, Any, Hashable
 
 from . import lib
 
 
-class SimpleIndex(UserList):
-    def unique(self) -> SimpleIndex:
+class _SimpleIndex(UserList):
+    def unique(self) -> _SimpleIndex:
         # set() operations don't preserve order
-        return SimpleIndex(dict.fromkeys(self))
+        return _SimpleIndex(dict.fromkeys(self))
 
-    def difference(self, other: Iterable) -> SimpleIndex:
+    def difference(self, other: Iterable) -> _SimpleIndex:
         # must be unique
-        return SimpleIndex(k for k in self.unique() if k not in other)
+        return _SimpleIndex(k for k in self.unique() if k not in other)
 
-    def union(self, other: Iterable) -> SimpleIndex:
+    def union(self, other: Iterable) -> _SimpleIndex:
         # can have duplicates
         # to implement a full-fledged duplicate behavior, in the
         # sense that the index with most dupes win is quite tricky,
         # and seems impossible without value counting or successive
         # adding or removing items.
         # Index([1,1,2]).union(Index([1,2,2]) => Index([1,1,2,2])
-        return self + SimpleIndex(k for k in other if k not in self)
+        return self + _SimpleIndex(k for k in other if k not in self)
 
-    def intersection(self, other: Iterable) -> SimpleIndex:
+    def intersection(self, other: Iterable) -> _SimpleIndex:
         # must be unique
-        return SimpleIndex(k for k in self.unique() if k in other)
+        return _SimpleIndex(k for k in self.unique() if k in other)
 
-    def symmetric_difference(self, other: Iterable) -> SimpleIndex:
+    def symmetric_difference(self, other: Iterable) -> _SimpleIndex:
         # must be unique
-        return SimpleIndex(
+        return _SimpleIndex(
             k for k in self.union(other).unique() if k not in self.intersection(other)
         )
 
@@ -53,7 +53,7 @@ class SliceDict(UserDict, dict):
     # __get/set/del-item__
     # =====================================================
 
-    def _expand_key(self, key: Any) -> SimpleIndex:
+    def _expand_key(self, key: Any) -> _SimpleIndex:
         """
         Expand slice- and list-like and boolean list-likes to an index.
 
@@ -74,17 +74,18 @@ class SliceDict(UserDict, dict):
             or if key cannot be cast to Index
         """
         if isinstance(key, slice):
-            key = SimpleIndex(self.keys())[key]
+            key = _SimpleIndex(self.keys())[key]
         elif lib.is_list_like(key):
-            if lib.is_boolean_indexer(key):
+            if lib.is_boolean_indexer(key):  # exclude pd.DataFrame
                 if len(key) != len(self.keys()):
                     raise ValueError(
                         f"Boolean indexer has wrong length: "
                         f"{len(key)} instead of {len(self.keys())}"
                     )
-                key = SimpleIndex(k for i, k in enumerate(self.keys()) if key[i])
-            elif not isinstance(key, SimpleIndex):
-                key = SimpleIndex(key)
+                key = list(key)  # remove index eg. for pd.Series
+                key = _SimpleIndex(k for i, k in enumerate(self.keys()) if key[i])
+            elif not isinstance(key, _SimpleIndex):
+                key = _SimpleIndex(key)
         else:
             raise TypeError(
                 f"Key must be hashable, a list-like of hashable items or a slice, "
@@ -160,6 +161,27 @@ class SliceDict(UserDict, dict):
         return self.__class__(
             {k: super(self.__class__, self).__getitem__(k) for k in key}
         )
+
+    # added to dict in py3.8
+    def __reversed__(self):
+        return reversed(self.keys())
+
+    # added to dict in py3.9
+    def __or__(self, other):
+        return self.__class__(self, **other)
+
+    def __ror__(self, other):
+        return self.__class__(other, **self)
+
+    # added to dict in py3.9
+    def __ior__(self, other):
+        data = dict(self.data)
+        try:
+            self.update(other)
+            data = self.data
+        finally:
+            self.data = data
+        return self
 
 
 class TypedSliceDict(SliceDict):

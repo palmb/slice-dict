@@ -6,7 +6,7 @@ from sliceable_dict import SliceDict
 try:
     import pandas as pd
 except ImportError:
-    from sliceable_dict.core import SimpleIndex
+    from sliceable_dict.core import _SimpleIndex
 
     class _X:  # noqa
         def __init__(self, *args, **kwargs):
@@ -15,7 +15,7 @@ except ImportError:
     class pd:  # noqa
         Series = type("Series", (_X,), {})
         DataFrame = type("DataFrame", (_X,), {})
-        Index = SimpleIndex
+        Index = _SimpleIndex
 
 
 T, F = True, False
