@@ -2,12 +2,9 @@
 from __future__ import annotations
 
 from collections import UserDict, UserList
-from typing import Iterable, overload, Any, Hashable, final, Tuple
+from typing import Iterable, overload, Any, Hashable, Tuple
 
 from . import lib
-
-
-# todo: spead the `final()` word to the world
 
 
 class SimpleIndex(UserList):
@@ -106,7 +103,6 @@ class SliceDict(UserDict, dict):
     def __setitem__(self, key, value):
         """Sets a value or a collection of values."""
 
-        # includes generators, range(3), etc.
         if lib.is_hashable(key):
             return self.__setitem_single__(key, value)
         key = self._expand_key(key)
@@ -148,8 +144,10 @@ class SliceDict(UserDict, dict):
     def __getitem__(self, key):
         # scalar gives item, all other kinds of keys
         # return __class__ type instances (dict-likes)
-        if lib.is_hashable(key):
+        try:
             return super().__getitem__(key)
+        except TypeError:  # not hashable
+            pass
 
         key = self._expand_key(key)
 

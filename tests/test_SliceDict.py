@@ -7,12 +7,16 @@ try:
     import pandas as pd
 except ImportError:
     from sliceable_dict.core import SimpleIndex
+
     class _X:  # noqa
-        def __init__(self, *args, **kwargs): return
-    class pd:    # noqa
+        def __init__(self, *args, **kwargs):
+            return
+
+    class pd:  # noqa
         Series = type("Series", (_X,), {})
         DataFrame = type("DataFrame", (_X,), {})
         Index = SimpleIndex
+
 
 T, F = True, False
 
@@ -40,20 +44,20 @@ def test_attrs(container_or_child, attr):
     assert hasattr(container_or_child, attr)
 
 
-_test_values = [
-    None,
-    1,
-    "string",
-    ["0", 1, 2.0],
-    {"key": "value"},
-    SliceDict(x="x"),
-    AnyChild(x="x"),
-    pd.Series(index=[1, 2], dtype=float),
-    pd.DataFrame(1, index=[1, 2], columns=["c0", "c1"]),
-]
-
-
-@pytest.mark.parametrize("value", _test_values)
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        1,
+        "string",
+        ["0", 1, 2.0],
+        {"key": "value"},
+        SliceDict(x="x"),
+        AnyChild(x="x"),
+        pd.Series(index=[1, 2], dtype=float),
+        pd.DataFrame(1, index=[1, 2], columns=["c0", "c1"]),
+    ],
+)
 def test_values(container_or_child, value):
     bc = container_or_child(a=value)
     assert isinstance(bc["a"], type(value))
@@ -106,9 +110,9 @@ def test__getitem__complex_keys(container_or_child, key, expected):
         ([T, F], ValueError, r"Boolean indexer has wrong length"),
         ([T, F, F, F], ValueError, r"Boolean indexer has wrong length"),
         (
-                slice("a"),
-                TypeError,
-                "slice indices must be integers or None or have an __index__ method",
+            slice("a"),
+            TypeError,
+            "slice indices must be integers or None or have an __index__ method",
         ),
     ],
 )
