@@ -4,13 +4,9 @@ from typing import Any, Hashable
 from collections import abc
 
 
-def is_iterator(obj):
-    return isinstance(obj, abc.Iterator)
-
-
 # taken from
 # https://github.com/pandas-dev/pandas/blob/v1.5.2/pandas/core/dtypes/inference.py
-def is_hashable(obj) -> bool:
+def is_hashable(obj: Any) -> bool:
     """
     Return True if hash(obj) will succeed, False otherwise.
     Some types will pass a test against collections.abc.Hashable but fail when
@@ -45,7 +41,7 @@ def is_hashable(obj) -> bool:
 
 # taken from:
 # https://github.com/pandas-dev/pandas/blob/v1.5.2/pandas/core/dtypes/inference.py
-def is_dict_like(obj) -> bool:
+def is_dict_like(obj: Any) -> bool:
     """
         Check if the object is dict-like.
         Parameter    def is_hashable(obj):
@@ -85,7 +81,7 @@ def is_dict_like(obj) -> bool:
 
 # taken and modified from
 # https://github.com/pandas-dev/pandas/blob/v1.5.2/pandas/_libs/lib.pyx
-def is_list_like(obj, allow_sets=True):
+def is_list_like(obj: Any, allow_sets: bool = True):
     """
     Check if the object is list-like.
 
@@ -144,6 +140,8 @@ def is_list_like(obj, allow_sets=True):
 def is_boolean_indexer(obj: abc.Iterable) -> bool:
     """
     Check whether `obj` is a valid boolean indexer.
+
+    This assumes that obj is iterable !
 
     Parameters
     ----------

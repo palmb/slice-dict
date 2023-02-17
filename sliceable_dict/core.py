@@ -2,57 +2,15 @@
 from __future__ import annotations
 
 from collections import UserDict, UserList
-from typing import Iterable, overload, Any, Hashable
-
+from typing import Iterable, overload, Any, Hashable, Iterator
 from . import lib
 
+try:
+    from typing import Self
+except ImportError:
+    from typing import TypeVar
 
-class _SimpleIndex(UserList):
-    def __init__(self, initlist=None, dtype=None):
-        super().__init__(initlist)
-        self.dtype = dtype or getattr(initlist, "dtype", None)
-
-    def __finalize__(self, other: _SimpleIndex):
-        self.dtype = other.dtype
-        return self
-
-    def unique(self) -> _SimpleIndex:
-        # set() operations don't preserve order
-        return _SimpleIndex(dict.fromkeys(self)).__finalize__(self)
-
-    def difference(self, other: Iterable) -> _SimpleIndex:
-        # must be unique
-        return _SimpleIndex(k for k in self.unique() if k not in other).__finalize__(
-            self
-        )
-
-    def union(self, other: Iterable) -> _SimpleIndex:
-        # can have duplicates
-        # to implement a full-fledged duplicate behavior, in the
-        # sense that the index with most dupes win is quite tricky,
-        # and seems impossible without value counting or successive
-        # adding or removing items.
-        # Index([1,1,2]).union(Index([1,2,2]) => Index([1,1,2,2])
-        return (self + _SimpleIndex(k for k in other if k not in self)).__finalize__(
-            self
-        )
-
-    def intersection(self, other: Iterable) -> _SimpleIndex:
-        # must be unique
-        return _SimpleIndex(k for k in self.unique() if k in other).__finalize__(self)
-
-    def symmetric_difference(self, other: Iterable) -> _SimpleIndex:
-        # must be unique
-        return _SimpleIndex(
-            k for k in self.union(other).unique() if k not in self.intersection(other)
-        ).__finalize__(self)
-
-    @property
-    def empty(self) -> bool:
-        return len(self) == 0
-
-    def tolist(self) -> list:
-        return list(self.data)  # shallow copy
+    Self = TypeVar("Self", bound="SliceDict")
 
 
 class SliceDict(UserDict, dict):
@@ -65,7 +23,7 @@ class SliceDict(UserDict, dict):
     # __get/set/del-item__
     # =====================================================
 
-    def _expand_key(self, key: Any) -> _SimpleIndex:
+    def _expand_key(self: Self, key: Any) -> _SimpleIndex:
         """
         Expand slice- and list-like and boolean list-likes to an index.
 
@@ -109,11 +67,11 @@ class SliceDict(UserDict, dict):
         return key
 
     @overload
-    def __setitem__(self, key: Hashable, value: Any) -> None:
+    def __setitem__(self: Self, key: Hashable, value: Any) -> None:
         ...  # pragma: no cover
 
     @overload
-    def __setitem__(self, key: slice | Iterable, value: Iterable) -> None:
+    def __setitem__(self: Self, key: slice | Iterable, value: Iterable) -> None:
         ...  # pragma: no cover
 
     def __setitem__(self, key, value):
@@ -146,15 +104,15 @@ class SliceDict(UserDict, dict):
         finally:
             self.data = data
 
-    def __setitem_single__(self, key: Hashable, value: Any):
+    def __setitem_single__(self: Self, key: Hashable, value: Any) -> None:
         return super().__setitem__(key, value)
 
     @overload
-    def __getitem__(self, key: Hashable) -> Any:
+    def __getitem__(self: Self, key: Hashable) -> Any:
         ...  # pragma: no cover
 
     @overload
-    def __getitem__(self, key: slice | Iterable) -> SliceDict:
+    def __getitem__(self: Self, key: slice | Iterable) -> Self:
         ...  # pragma: no cover
 
     def __getitem__(self, key):
@@ -178,18 +136,19 @@ class SliceDict(UserDict, dict):
         )
 
     # added to dict in py3.8
-    def __reversed__(self):
+    def __reversed__(self: Self) -> Iterator:
         return reversed(self.keys())
 
     # added to dict in py3.9
-    def __or__(self, other):
+    def __or__(self: Self, other: Self) -> Self:
         return self.__class__(self, **other)
 
-    def __ror__(self, other):
+    def __ror__(self: Self, other: Self) -> Self:
         return self.__class__(other, **self)
 
     # added to dict in py3.9
-    def __ior__(self, other):
+    def __ior__(self: Self, other: Self) -> Self:
+        # return self, even if inplace
         data = dict(self.data)
         try:
             self.update(other)
@@ -204,23 +163,25 @@ class TypedSliceDict(SliceDict):
     _value_types: tuple = ()
 
     @property
-    def value_types(self):
+    def value_types(self) -> tuple[type, ...]:
         return self._value_types or Any
 
     @property
-    def key_types(self):
+    def key_types(self) -> tuple[type, ...]:
         return self._key_types or Hashable
 
-    def __setitem_single__(self, key: Hashable, value: Any):
-        self._validate_type(key, self._key_types, "key", errors="raise")
-        self._validate_type(value, self._value_types, "value", errors="raise")
+    def __setitem_single__(self, key: Hashable, value: Any) -> None:
+        if self._key_types:
+            self._validate_type(key, self._key_types, "key", errors="raise")
+        if self._value_types:
+            self._validate_type(value, self._value_types, "value", errors="raise")
         super().__setitem_single__(key, value)
 
     @staticmethod
-    def _validate_type(obj: object, types: type | tuple, name, errors="raise"):
+    def _validate_type(
+        obj: object, types: type | tuple[type, ...], name: str, errors: str = "raise"
+    ) -> bool:
         # errors: 'ignore' or 'raise'
-        if not types:
-            return True
         if isinstance(obj, types):
             return True
         if errors == "ignore":
@@ -228,3 +189,51 @@ class TypedSliceDict(SliceDict):
         raise TypeError(
             f"{name} must be of type {' or '.join(map(repr, types))}, not {type(obj)}"
         )
+
+
+class _SimpleIndex(UserList):
+    def __init__(self, initlist: Iterable | None = None, dtype: type = None):
+        super().__init__(initlist)
+        self.dtype = dtype or getattr(initlist, "dtype", None)
+
+    def __finalize__(self: _SimpleIndex, other: _SimpleIndex) -> _SimpleIndex:
+        self.dtype = other.dtype
+        return self
+
+    def unique(self: _SimpleIndex) -> _SimpleIndex:
+        # set() operations don't preserve order
+        return _SimpleIndex(dict.fromkeys(self)).__finalize__(self)
+
+    def difference(self: _SimpleIndex, other: Iterable) -> _SimpleIndex:
+        # must be unique
+        return _SimpleIndex(k for k in self.unique() if k not in other).__finalize__(
+            self
+        )
+
+    def union(self: _SimpleIndex, other: Iterable) -> _SimpleIndex:
+        # can have duplicates
+        # to implement a full-fledged duplicate behavior, in the
+        # sense that the index with most dupes win is quite tricky,
+        # and seems impossible without value counting or successive
+        # adding or removing items.
+        # Index([1,1,2]).union(Index([1,2,2]) => Index([1,1,2,2])
+        return (self + _SimpleIndex(k for k in other if k not in self)).__finalize__(
+            self
+        )
+
+    def intersection(self: _SimpleIndex, other: Iterable) -> _SimpleIndex:
+        # must be unique
+        return _SimpleIndex(k for k in self.unique() if k in other).__finalize__(self)
+
+    def symmetric_difference(self: _SimpleIndex, other: Iterable) -> _SimpleIndex:
+        # must be unique
+        return _SimpleIndex(
+            k for k in self.union(other).unique() if k not in self.intersection(other)
+        ).__finalize__(self)
+
+    @property
+    def empty(self: _SimpleIndex) -> bool:
+        return len(self) == 0
+
+    def tolist(self: _SimpleIndex) -> list:
+        return list(self.data)  # shallow copy
