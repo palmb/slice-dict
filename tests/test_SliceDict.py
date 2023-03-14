@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import pytest
 import numpy as np
-from sliceable_dict import SliceDict
+from sliceable_dict import SliceDict, TypedSliceDict
 
 try:
     import pandas as pd
@@ -25,7 +25,7 @@ class AnyChild(SliceDict):
     pass
 
 
-@pytest.fixture(params=[SliceDict, AnyChild])
+@pytest.fixture(params=[SliceDict, AnyChild, TypedSliceDict])
 def container_or_child(request):
     return request.param
 

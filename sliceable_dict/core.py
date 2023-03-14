@@ -2,15 +2,14 @@
 from __future__ import annotations
 
 from collections import UserDict, UserList
-from typing import Iterable, overload, Any, Hashable, Iterator
+from typing import Iterable, overload, Any, Hashable, Iterator, TypeVar, Union
+
+from typing_extensions import final
+
 from . import lib
 
-try:
-    from typing import Self
-except ImportError:
-    from typing import TypeVar
-
-    Self = TypeVar("Self", bound="SliceDict")
+SliceDictT = TypeVar("SliceDictT", bound="SliceDict")
+DictLike = Union[SliceDictT, dict]
 
 
 class SliceDict(UserDict, dict):
@@ -23,7 +22,7 @@ class SliceDict(UserDict, dict):
     # __get/set/del-item__
     # =====================================================
 
-    def _expand_key(self: Self, key: Any) -> _SimpleIndex:
+    def _expand_key(self, key: Any) -> _SimpleIndex:
         """
         Expand slice- and list-like and boolean list-likes to an index.
 
@@ -71,11 +70,11 @@ class SliceDict(UserDict, dict):
         return key
 
     @overload
-    def __setitem__(self: Self, key: Hashable, value: Any) -> None:
+    def __setitem__(self, key: Hashable, value: Any) -> None:
         ...  # pragma: no cover
 
     @overload
-    def __setitem__(self: Self, key: slice | Iterable, value: Iterable) -> None:
+    def __setitem__(self, key: slice | Iterable, value: Iterable) -> None:
         ...  # pragma: no cover
 
     def __setitem__(self, key, value):
@@ -108,15 +107,15 @@ class SliceDict(UserDict, dict):
         finally:
             self.data = data
 
-    def __setitem_single__(self: Self, key: Hashable, value: Any) -> None:
+    def __setitem_single__(self, key: Hashable, value: Any) -> None:
         return super().__setitem__(key, value)
 
     @overload
-    def __getitem__(self: Self, key: Hashable) -> Any:
+    def __getitem__(self, key: Hashable) -> Any:
         ...  # pragma: no cover
 
     @overload
-    def __getitem__(self: Self, key: slice | Iterable) -> Self:
+    def __getitem__(self: SliceDictT, key: slice | Iterable) -> SliceDictT:
         ...  # pragma: no cover
 
     def __getitem__(self, key):
@@ -140,18 +139,18 @@ class SliceDict(UserDict, dict):
         )
 
     # added to dict in py3.8
-    def __reversed__(self: Self) -> Iterator:
+    def __reversed__(self) -> Iterator:
         yield from reversed(self.keys())
 
     # added to dict in py3.9
-    def __or__(self: Self, other: Self) -> Self:
+    def __or__(self: SliceDictT, other: DictLike) -> SliceDictT:
         return self.__class__(self, **other)
 
-    def __ror__(self: Self, other: Self) -> Self:
+    def __ror__(self: SliceDictT, other: DictLike) -> SliceDictT:
         return self.__class__(other, **self)
 
     # added to dict in py3.9
-    def __ior__(self: Self, other: Self) -> Self:
+    def __ior__(self: SliceDictT, other: DictLike) -> SliceDictT:
         # return self, even if inplace
         data = dict(self.data)
         try:
@@ -166,15 +165,12 @@ class TypedSliceDict(SliceDict):
     _key_types: tuple = ()
     _value_types: tuple = ()
 
-    @property
-    def value_types(self) -> tuple[type, ...]:
-        return self._value_types or Any
+    def _cast(self, key: Any, value: Any) -> tuple[Any, Any]:
+        return key, value
 
-    @property
-    def key_types(self) -> tuple[type, ...]:
-        return self._key_types or Hashable
-
+    @final
     def __setitem_single__(self, key: Hashable, value: Any) -> None:
+        key, value = self._cast(key, value)
         if self._key_types:
             self._validate_type(key, self._key_types, "key", errors="raise")
         if self._value_types:
@@ -185,6 +181,8 @@ class TypedSliceDict(SliceDict):
     def _validate_type(
         obj: object, types: type | tuple[type, ...], name: str, errors: str = "raise"
     ) -> bool:
+        if isinstance(types, type):
+            types = (type,)
         # errors: 'ignore' or 'raise'
         if isinstance(obj, types):
             return True
@@ -196,7 +194,7 @@ class TypedSliceDict(SliceDict):
 
 
 class _SimpleIndex(UserList):
-    def __init__(self, initlist: Iterable | None = None, dtype: type = None):
+    def __init__(self, initlist: Iterable | None = None, dtype: type | None = None):
         super().__init__(initlist)
         self.dtype = dtype or getattr(initlist, "dtype", None)
         if not lib.check_all(self, lib.is_hashable):
@@ -207,28 +205,28 @@ class _SimpleIndex(UserList):
         self.dtype = other.dtype
         return self
 
-    def append(self, item: Hashable) -> _SimpleIndex:
+    def append(self, item: Hashable) -> _SimpleIndex:  # type: ignore
         if not lib.is_hashable(item):
             raise TypeError(f"unhashable type: {type(item)!r}")
         data = list(self.data)
         data.append(item)
         return _SimpleIndex(data)
 
-    def insert(self, i: int, item: Hashable) -> _SimpleIndex:
+    def insert(self, i: int, item: Hashable) -> _SimpleIndex:  # type: ignore
         if not lib.is_hashable(item):
             raise TypeError(f"unhashable type: {type(item)!r}")
         data = list(self.data)
         data.insert(i, item)
         return _SimpleIndex(data)
 
-    def extend(self, other: _SimpleIndex) -> _SimpleIndex:
+    def extend(self, other: _SimpleIndex) -> _SimpleIndex:  # type: ignore
         if not isinstance(other, _SimpleIndex):
-            raise TypeError('all inputs must be _SimpleIndex')
+            raise TypeError("all inputs must be _SimpleIndex")
         data = list(self.data)
         data.extend(other.data)
         return _SimpleIndex(data)
 
-    def clear(self) -> _SimpleIndex:
+    def clear(self) -> _SimpleIndex:  # type: ignore
         return _SimpleIndex()
 
     def __setitem__(self, key, value):
