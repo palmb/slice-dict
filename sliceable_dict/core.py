@@ -43,6 +43,10 @@ class SliceDict(UserDict, dict):
         TypeError: If key is a slice of other than integer
             or if key cannot be cast to Index
         """
+        type_err = TypeError(
+            f"Key must be hashable, a list-like of hashable items, "
+            f"a boolean list-like or a slice, not of type {type(key)}"
+        )
         if isinstance(key, slice):
             key = _SimpleIndex(self.keys())[key]
 
@@ -50,7 +54,10 @@ class SliceDict(UserDict, dict):
             # making a list from key, ensures numeric indexing
             # even if key has an index attribute that would be
             # used otherwise (e.g. with pd.Series)
-            key = _SimpleIndex(key)
+            try:
+                key = _SimpleIndex(key)
+            except Exception:
+                raise type_err from None  # pragma: no cover
 
             if lib.is_boolean_indexer(key):
                 if len(key) != len(self.keys()):
@@ -60,10 +67,7 @@ class SliceDict(UserDict, dict):
                     )
                 key = _SimpleIndex(k for i, k in enumerate(self.keys()) if key[i])
         else:
-            raise TypeError(
-                f"Key must be hashable, a list-like of hashable items, "
-                f"a boolean list-like or a slice, not of type {type(key)}"
-            )  # pragma: no cover
+            raise type_err  # pragma: no cover
         return key
 
     @overload
@@ -137,7 +141,7 @@ class SliceDict(UserDict, dict):
 
     # added to dict in py3.8
     def __reversed__(self: Self) -> Iterator:
-        return reversed(self.keys())
+        yield from reversed(self.keys())
 
     # added to dict in py3.9
     def __or__(self: Self, other: Self) -> Self:
@@ -195,10 +199,54 @@ class _SimpleIndex(UserList):
     def __init__(self, initlist: Iterable | None = None, dtype: type = None):
         super().__init__(initlist)
         self.dtype = dtype or getattr(initlist, "dtype", None)
+        if not lib.check_all(self, lib.is_hashable):
+            self.clear()
+            raise ValueError("all items must be hashable")
 
     def __finalize__(self: _SimpleIndex, other: _SimpleIndex) -> _SimpleIndex:
         self.dtype = other.dtype
         return self
+
+    def append(self, item: Hashable) -> _SimpleIndex:
+        if not lib.is_hashable(item):
+            raise TypeError(f"unhashable type: {type(item)!r}")
+        data = list(self.data)
+        data.append(item)
+        return _SimpleIndex(data)
+
+    def insert(self, i: int, item: Hashable) -> _SimpleIndex:
+        if not lib.is_hashable(item):
+            raise TypeError(f"unhashable type: {type(item)!r}")
+        data = list(self.data)
+        data.insert(i, item)
+        return _SimpleIndex(data)
+
+    def extend(self, other: _SimpleIndex) -> _SimpleIndex:
+        if not isinstance(other, _SimpleIndex):
+            raise TypeError('all inputs must be _SimpleIndex')
+        data = list(self.data)
+        data.extend(other.data)
+        return _SimpleIndex(data)
+
+    def clear(self) -> _SimpleIndex:
+        return _SimpleIndex()
+
+    def __setitem__(self, key, value):
+        raise TypeError("Index does not support mutable operations")
+
+    def __delitem__(self, key):
+        raise TypeError("Index does not support mutable operations")
+
+    @property
+    def is_unique(self: _SimpleIndex) -> bool:
+        return len(self) == len(set(self))
+
+    @property
+    def empty(self: _SimpleIndex) -> bool:
+        return len(self) == 0
+
+    def tolist(self: _SimpleIndex) -> list:
+        return list(self.data)  # shallow copy
 
     def unique(self: _SimpleIndex) -> _SimpleIndex:
         # set() operations don't preserve order
@@ -230,10 +278,3 @@ class _SimpleIndex(UserList):
         return _SimpleIndex(
             k for k in self.union(other).unique() if k not in self.intersection(other)
         ).__finalize__(self)
-
-    @property
-    def empty(self: _SimpleIndex) -> bool:
-        return len(self) == 0
-
-    def tolist(self: _SimpleIndex) -> list:
-        return list(self.data)  # shallow copy

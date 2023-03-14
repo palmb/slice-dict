@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typing import Any, Hashable
+from typing import Any, Hashable, Callable
 from collections import abc
 
 
@@ -158,5 +158,10 @@ def is_boolean_indexer(obj: abc.Iterable) -> bool:
         hasattr(obj, "dtype")
         and obj.dtype == bool
         # (return first non-boolean element or return True) is True
-        or next(filter(lambda e: not isinstance(e, bool), obj), True) is True
+        or check_all(obj, lambda e: isinstance(e, bool))
     )
+
+
+def check_all(obj: abc.Iterable, cond: Callable[[Any], bool]) -> bool:
+    """stop if condition fails first time"""
+    return next(filter(lambda item: not cond(item), obj), True) is True
