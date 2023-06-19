@@ -12,7 +12,7 @@ SliceDictT = TypeVar("SliceDictT", bound="SliceDict")
 DictLike = Union[SliceDictT, dict]
 
 
-class SliceDict(UserDict, dict):
+class SliceDict(UserDict):
     """
     A dict like container that support slicing, boolean selection
     and passing multiple keys at once.

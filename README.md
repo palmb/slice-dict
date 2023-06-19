@@ -22,9 +22,6 @@ An example usage:
 >>> d
 {'zero': 0, 'one': 1,}
 
->>> isinstance(d, dict)
-True
-
 # multi-key support 
 >>> d[['two', 'three']] = 2, 3
 >>> d[['one', 'three']]

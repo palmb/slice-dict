@@ -36,7 +36,6 @@ def test_creation(container_or_child, args, kwargs):
     bc = container_or_child(*args, **kwargs)
     assert isinstance(bc, container_or_child)
     assert isinstance(bc, SliceDict)
-    assert isinstance(bc, dict)
 
 
 @pytest.mark.parametrize("attr", dir(dict))
